@@ -18,9 +18,9 @@ const displayFont = Cormorant_Garamond({
 });
 
 export const metadata = {
-  title: "FlavFlix",
+  title: "FlavFlix Showcase",
   description:
-    "A cinematic movie-discovery learning project powered by TMDB metadata and synchronized account state.",
+    "A five-minute interactive demonstration of the FlavFlix movie and TV discovery project.",
   icons: {
     icon: "/flavflix_favicon.png",
     shortcut: "/flavflix_favicon.png",
