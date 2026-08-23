@@ -26,11 +26,14 @@ FlavFlix Showcase is the public, interactive demonstration of my private FlavFli
 Each movie or TV episode receives a maximum five-minute preview in this showcase.
 This showcase is meant for demonstration purposes only.
 
-## Playback and content disclaimer
+## Disclaimer
 
-FlavFlix does not host, upload, store, or distribute films or television content. Playback, availability, subtitles, and player behaviour are supplied entirely by independent third-party providers embedded by the application. Those services are not operated or controlled by this project.
-
-Movie and television metadata and images are supplied by TMDB, with optional ratings from OMDb. FlavFlix is a personal educational and portfolio project and is not affiliated with Netflix, TMDB, OMDb, any playback provider, studio, broadcaster, or rights holder.
+> [!WARNING]
+> **Playback and third-party content**
+>
+> FlavFlix does not host, upload, store, or distribute films or television content. Playback, availability, subtitles, and player behaviour are supplied entirely by independent third-party providers embedded by the application. Those services are not operated or controlled by this project.
+>
+> Movie and television metadata and images are supplied by TMDB, with optional ratings from OMDb. FlavFlix is a personal educational and portfolio demonstration and is not affiliated with Netflix, TMDB, OMDb, any playback provider, studio, broadcaster, or rights holder.
 
 ## Run the showcase locally
 
