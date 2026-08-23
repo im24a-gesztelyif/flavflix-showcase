@@ -236,13 +236,13 @@ function AddProfileTile({ disabled = false, onClick }) {
       <p className="mt-3 text-base font-semibold text-white sm:mt-4 sm:text-lg md:text-2xl">
         {disabled ? "Profile Limit Reached" : "Add Profile"}
       </p>
-      {disabled ? <p className="mt-2 text-sm text-white/45">Accounts are capped at {MAX_PROFILES} profiles.</p> : null}
+      {disabled ? <p className="mt-2 text-sm text-white/45">This showcase is capped at {MAX_PROFILES} profiles.</p> : null}
     </button>
   );
 }
 
 function ProfileGate({ profiles, onSelect, onCreate, onUpdate, onRemove }) {
-  const [manageMode, setManageMode] = useState(false);
+  const [manageMode, setManageMode] = useState(() => profiles.length === 0);
   const [editor, setEditor] = useState(null);
   const [editorBusy, setEditorBusy] = useState(false);
   const [editorError, setEditorError] = useState("");
@@ -364,7 +364,9 @@ function ProfileGate({ profiles, onSelect, onCreate, onUpdate, onRemove }) {
         <div className="w-full max-w-7xl text-center">
           <div className="mb-6 sm:mb-8">
             <BrandLogo className="mx-auto w-[200px] sm:w-[250px] md:w-[290px]" priority />
-            <p className="mt-3 text-base text-white/60 sm:mt-4 sm:text-lg">{manageMode ? "Manage Profiles" : "Who's watching?"}</p>
+            <p className="mt-3 text-base text-white/60 sm:mt-4 sm:text-lg">
+              {profiles.length === 0 ? "Create a local profile to begin" : manageMode ? "Manage Profiles" : "Who's watching?"}
+            </p>
           </div>
 
           {usesRail ? (
@@ -451,7 +453,7 @@ function ProfileGate({ profiles, onSelect, onCreate, onUpdate, onRemove }) {
 
           {manageMode ? (
             <p className="mt-4 text-sm text-white/45">
-              {profiles.length} / {MAX_PROFILES} profiles used on this account.
+              {profiles.length} / {MAX_PROFILES} profiles stored in this browser.
             </p>
           ) : null}
 
@@ -781,7 +783,7 @@ function ShellFooter() {
         <div>
           <BrandLogo className="w-[148px] sm:w-[180px]" />
           <p className="mt-2 max-w-2xl text-xs leading-6 text-white/52 sm:text-sm">
-            A cinematic shell for discovery, lists, and synced watch state, with film and TV metadata attributed to TMDB.
+            A cinematic shell for discovery, lists, and local watch state, with film and TV metadata attributed to TMDB.
           </p>
         </div>
         <TmdbAttribution
@@ -913,11 +915,11 @@ export function AppShell({ children }) {
   }
 
   if (!authReady || !ready) {
-    return <LoadingState fullScreen brand title="FlavFlix" description="Opening your account cinema." />;
+    return <LoadingState fullScreen brand title="FlavFlix" description="Opening the showcase." />;
   }
 
   if (!user) {
-    return <LoadingState fullScreen brand title="FlavFlix" description="Handing you off to account access." />;
+    return <LoadingState fullScreen brand title="FlavFlix" description="Preparing local profile access." />;
   }
 
   if (!activeProfile) {
