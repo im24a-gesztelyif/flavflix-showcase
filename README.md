@@ -1,89 +1,59 @@
 # FlavFlix Showcase
 
-A public learning showcase for a cinematic movie and TV discovery application built with Next.js, TMDB, OMDb, and Supabase.
+FlavFlix Showcase is the public, interactive demonstration of my private FlavFlix project: a cinematic movie and TV hub built with Next.js, React, Tailwind CSS, TMDB, and OMDb.
 
-> **Learning-project note:** This repository focuses on interface architecture, discovery, authentication, profiles, lists, history, and synchronized account state. Experimental third-party playback integrations from the private development project are intentionally excluded.
+**Live demonstration:** [flavflix-showcase.vercel.app](https://flavflix-showcase.vercel.app)
 
 [![CI](https://github.com/im24a-gesztelyif/flavflix-showcase/actions/workflows/ci.yml/badge.svg)](https://github.com/im24a-gesztelyif/flavflix-showcase/actions/workflows/ci.yml)
 
-![FlavFlix account interface](docs/screenshots/home.png)
+![FlavFlix home interface](docs/screenshots/home.png)
 
-## Implemented features
+> [!IMPORTANT]
+> This repository is the portfolio showcase, not the complete private FlavFlix codebase. It runs without accounts or a cloud database, stores showcase data only in the visitor's browser, and limits playback of each movie or TV episode to five minutes.
 
-- Movie and TV discovery rails backed by TMDB
-- Search across titles, people, and production companies
-- Detailed title, season, episode, collection, person, and company views
-- OMDb rating enrichment
-- Supabase authentication and account-backed profiles
-- Saved titles, history, progress records, preferences, and account deletion
-- Responsive navigation, loading states, caching, and TMDB attribution
-- Public showcase mode that intentionally disables playback
+## What you can demonstrate
 
-## Technology stack
+- Browse movie and TV discovery rails backed by live TMDB metadata
+- Search titles, people, and production companies
+- Open movie, series, season, episode, collection, person, and company pages
+- View OMDb rating enrichment when configured
+- Create and manage up to four local profiles
+- Save titles and maintain local watch history, progress, preferences, and continue-watching rows
+- Open film and episode playback through embedded third-party sources
+- Switch between available playback sources when necessary
+- Use the responsive desktop and mobile interface
 
-- Next.js App Router and React
-- Tailwind CSS
-- Supabase authentication and PostgreSQL data
-- TMDB and optional OMDb metadata APIs
-- Zod-backed validation and server routes
+## The five-minute preview
 
-## Architecture
+Each movie or TV episode receives a maximum five-minute preview in this showcase. The allowance is stored locally per profile and title, survives page refreshes and source changes, and cannot be restarted by reopening the same title. When the time expires, the embedded player is removed and the visitor can return to browse another title.
 
-- **Next.js App Router** for pages, layouts, loading states, and server routes
-- **React** for reusable discovery, detail, account, and profile interfaces
-- **Supabase** for authentication and relational account data
-- **TMDB and OMDb** accessed through server-side proxy routes
-- **Tailwind CSS** for the responsive visual system
+This limit applies to the showcase only. It keeps the public deployment focused on demonstrating the application, its interface, and its state management.
 
-## Local setup
+## Playback and content disclaimer
 
-1. Install dependencies:
+FlavFlix does not host, upload, store, or distribute films or television content. Playback, availability, subtitles, and player behaviour are supplied entirely by independent third-party providers embedded by the application. Those services are not operated or controlled by this project.
 
-   ```bash
-   npm install
-   ```
+Movie and television metadata and images are supplied by TMDB, with optional ratings from OMDb. FlavFlix is a personal educational and portfolio project and is not affiliated with Netflix, TMDB, OMDb, any playback provider, studio, broadcaster, or rights holder.
 
-2. Copy `.env.example` to `.env.local` and provide the required API and Supabase values.
+## Run the showcase locally
 
-3. Apply the SQL files in `supabase/migrations` to a Supabase project.
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-4. Start the application:
-
-   ```bash
-   npm run dev
-   ```
-
-## Configuration
+Add your server-side metadata API credentials to `.env.local`:
 
 | Variable | Purpose |
 |---|---|
-| `TMDB_READ_TOKEN` | Server-side TMDB API access |
-| `OMDB_API_KEY` | Optional OMDb ratings |
+| `TMDB_READ_TOKEN` | Required TMDB read access token |
+| `OMDB_API_KEY` | Optional OMDb ratings key |
 | `NEXT_PUBLIC_TMDB_LANGUAGE` | Default metadata language |
-| `NEXT_PUBLIC_TMDB_REGION` | Default regional settings |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser-safe Supabase key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only administrative operations |
+| `NEXT_PUBLIC_TMDB_REGION` | Default regional setting |
 
-Never commit real credentials. The checked-in `.env.example` contains placeholders only.
+No Supabase project, database, login, or account configuration is required. Profiles and application state use browser `localStorage` specifically for this public demonstration.
 
-## Verification
+## About the full project
 
-```bash
-npm run lint
-npm run build
-```
-
-## Limitations and next steps
-
-- Playback is disabled in this public repository.
-- A time-limited demonstration may be linked later, after it is independently reviewed.
-- The application requires external TMDB and Supabase configuration to run with live data.
-
-## Project context
-
-FlavFlix is a personal learning project used to practise full-stack React development, external API integration, authentication, relational data, state synchronization, responsive interface design, and project documentation. It is not affiliated with Netflix, TMDB, OMDb, or any film studio.
-
-## Learning outcomes
-
-The project developed my understanding of server/client boundaries in Next.js, secure API proxying, authentication flows, relational account data, caching, and maintaining a larger component-based interface.
+The private FlavFlix project includes the broader development implementation and account-backed version. This public repository is deliberately separated so recruiters and other visitors can explore a safe, self-contained demonstration without registration while still seeing the real discovery, profile, state, responsive UI, API, and time-limited playback work.

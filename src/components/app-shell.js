@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -533,7 +532,7 @@ function ProfileGate({ profiles, onSelect, onCreate, onUpdate, onRemove }) {
 }
 
 function UserMenu({ onChangeProfile }) {
-  const { activeProfile, signOut, user } = useAppState();
+  const { activeProfile } = useAppState();
   const [open, setOpen] = useState(false);
   const desktopItems = USER_MENU_ITEMS;
   const mobileItems = MOBILE_MENU_ITEMS;
@@ -559,13 +558,6 @@ function UserMenu({ onChangeProfile }) {
             onClick={() => setOpen(false)}
           />
           <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-50 rounded-[28px] border border-white/10 bg-[#0a0a0ef2] p-4 shadow-panel backdrop-blur-xl md:absolute md:right-0 md:top-full md:mt-3 md:w-[320px] md:inset-x-auto md:bottom-auto">
-          {user?.email ? (
-            <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-white/40">Signed In</p>
-              <p className="mt-2 truncate text-sm font-semibold text-white/82">{user.email}</p>
-            </div>
-          ) : null}
-
           <button
             type="button"
             onClick={() => {
@@ -615,17 +607,6 @@ function UserMenu({ onChangeProfile }) {
               })}
             </div>
 
-            <button
-              type="button"
-              onClick={async () => {
-                setOpen(false);
-                await signOut();
-              }}
-              className="mt-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm text-white/72 transition hover:bg-white/6 hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Log Out</span>
-            </button>
           </div>
           </div>
         </>
@@ -823,7 +804,6 @@ export function AppShell({ children }) {
   const [introVisible, setIntroVisible] = useState(true);
   const mobileItems = useMemo(() => MOBILE_PRIMARY_ITEMS, []);
   const navigationTimeoutRef = useRef(null);
-  const isAuthRoute = pathname.startsWith("/auth");
   const isWatchPage = pathname.startsWith("/watch/");
   const isHomePage = pathname === "/";
 
@@ -930,10 +910,6 @@ export function AppShell({ children }) {
 
   if (introVisible) {
     return <IntroOverlay onFinish={() => setIntroVisible(false)} />;
-  }
-
-  if (isAuthRoute) {
-    return <div className="min-h-screen bg-[#050507]">{children}</div>;
   }
 
   if (!authReady || !ready) {
