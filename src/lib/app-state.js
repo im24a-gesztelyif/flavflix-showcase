@@ -10,17 +10,34 @@ const STORAGE_KEY = "flavflix-showcase-state:v1";
 const SHOWCASE_USER = { id: "showcase-visitor", isShowcase: true };
 
 function createInitialState() {
-  return { profiles: [], activeProfileId: null, profileData: {} };
+  return { defaultsVersion: 2, profiles: [], activeProfileId: null, profileData: {} };
 }
 
 function normalizeState(value) {
   if (!value || !Array.isArray(value.profiles)) return createInitialState();
   const profiles = value.profiles.slice(0, MAX_PROFILES);
-  const profileData = Object.fromEntries(profiles.map((profile) => [
-    profile.id,
-    { ...createEmptyBucket(), ...(value.profileData?.[profile.id] || {}), loaded: true, loading: false },
-  ]));
+  const migrateProviderDefault = value.defaultsVersion !== 2;
+  const profileData = Object.fromEntries(profiles.map((profile) => {
+    const savedBucket = value.profileData?.[profile.id] || {};
+    return [
+      profile.id,
+      {
+        ...createEmptyBucket(),
+        ...savedBucket,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          ...(savedBucket.settings || {}),
+          defaultProvider: migrateProviderDefault
+            ? DEFAULT_SETTINGS.defaultProvider
+            : savedBucket.settings?.defaultProvider || DEFAULT_SETTINGS.defaultProvider,
+        },
+        loaded: true,
+        loading: false,
+      },
+    ];
+  }));
   return {
+    defaultsVersion: 2,
     profiles,
     activeProfileId: profiles.some((profile) => profile.id === value.activeProfileId) ? value.activeProfileId : null,
     profileData,
