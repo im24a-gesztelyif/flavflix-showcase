@@ -29,7 +29,7 @@ function HistoryClient() {
     <LibraryScreen
       eyebrow="History"
       title="Watch history"
-      description="A synced timeline of recent playback activity for the active profile."
+      description="A local timeline of recent playback activity for the active profile."
       items={items}
       emptyTitle="History will populate automatically"
       emptyDescription="The app writes watch history automatically as playback events come in."

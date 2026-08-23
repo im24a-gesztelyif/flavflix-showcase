@@ -6,7 +6,7 @@ export default function MoviesPage() {
     <BrowseScreen
       mediaType="movie"
       title="Movies"
-      description="Filtered movie discovery powered by TMDB discover endpoints with synced profile state layered on top."
+      description="Filtered movie discovery powered by TMDB discover endpoints with local profile state layered on top."
       sortOptions={MOVIE_SORT_OPTIONS}
     />
   );
