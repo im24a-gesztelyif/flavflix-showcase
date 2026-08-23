@@ -3,7 +3,7 @@ const LEGACY_STORAGE_KEY = "flavflix-state";
 const LEGACY_DATABASE_NAME = "flavflix";
 
 export const DEFAULT_SETTINGS = {
-  defaultProvider: "vidlink",
+  defaultProvider: "videasy",
   fallbackEnabled: true,
   autoplayNextEpisode: true,
   language: process.env.NEXT_PUBLIC_TMDB_LANGUAGE || "en-US",

@@ -225,7 +225,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   const { settings, recordProgress, activeProfile, activeProfileData, isSaved, toggleSaved } = useAppState();
   const initialSeasonNumber = initialSeason ? Number(initialSeason) : 1;
   const initialEpisodeNumber = initialEpisode ? Number(initialEpisode) : 1;
-  const [providerId, setProviderId] = useState(resolveProviderId(initialProvider || settings.defaultProvider || "vidlink"));
+  const [providerId, setProviderId] = useState(resolveProviderId(initialProvider || settings.defaultProvider || "videasy"));
   const [season, setSeason] = useState(initialSeasonNumber);
   const [episode, setEpisode] = useState(initialEpisodeNumber);
   const [displaySeason, setDisplaySeason] = useState(initialSeasonNumber);
