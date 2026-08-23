@@ -6,8 +6,6 @@ FlavFlix Showcase is the public, interactive demonstration of my private FlavFli
 
 [![CI](https://github.com/im24a-gesztelyif/flavflix-showcase/actions/workflows/ci.yml/badge.svg)](https://github.com/im24a-gesztelyif/flavflix-showcase/actions/workflows/ci.yml)
 
-![FlavFlix home interface](docs/screenshots/home.png)
-
 > [!IMPORTANT]
 > This repository is the portfolio showcase, not the complete private FlavFlix codebase. It runs without accounts or a cloud database, stores showcase data only in the visitor's browser, and limits playback of each movie or TV episode to five minutes.
 
@@ -25,9 +23,8 @@ FlavFlix Showcase is the public, interactive demonstration of my private FlavFli
 
 ## The five-minute preview
 
-Each movie or TV episode receives a maximum five-minute preview in this showcase. The allowance is stored locally per profile and title, survives page refreshes and source changes, and cannot be restarted by reopening the same title. When the time expires, the embedded player is removed and the visitor can return to browse another title.
-
-This limit applies to the showcase only. It keeps the public deployment focused on demonstrating the application, its interface, and its state management.
+Each movie or TV episode receives a maximum five-minute preview in this showcase.
+This showcase is meant for demonstration purposes only.
 
 ## Playback and content disclaimer
 
@@ -53,7 +50,3 @@ Add your server-side metadata API credentials to `.env.local`:
 | `NEXT_PUBLIC_TMDB_REGION` | Default regional setting |
 
 No Supabase project, database, login, or account configuration is required. Profiles and application state use browser `localStorage` specifically for this public demonstration.
-
-## About the full project
-
-The private FlavFlix project includes the broader development implementation and account-backed version. This public repository is deliberately separated so recruiters and other visitors can explore a safe, self-contained demonstration without registration while still seeing the real discovery, profile, state, responsive UI, API, and time-limited playback work.
