@@ -46,10 +46,10 @@ export async function GET(request) {
     );
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
-        error: error.message || "Failed to fetch OMDb data.",
+        error: "External ratings are unavailable right now.",
       },
       { status: 500 },
     );

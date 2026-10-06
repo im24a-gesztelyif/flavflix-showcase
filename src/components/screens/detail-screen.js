@@ -199,7 +199,7 @@ function OmdbRatingsPanel({ payload, loading, error, compact = false }) {
   }
 
   if (error) {
-    return <p className="text-sm text-white/52">{error}</p>;
+    return <p className="text-sm text-white/52">External ratings are unavailable right now.</p>;
   }
 
   if (!ratings.length) {
@@ -553,7 +553,7 @@ function DetailScreenContent({ mediaType, id }) {
 
   return (
     <div className="space-y-8">
-      <section className="relative left-1/2 right-1/2 -mx-[50vw] -mt-24 w-screen overflow-hidden sm:-mt-28">
+      <section className="relative -mx-4 -mt-24 overflow-hidden sm:-mt-28 xl:-mx-8">
         {heroBackdrop ? (
           <>
             <div
@@ -571,7 +571,7 @@ function DetailScreenContent({ mediaType, id }) {
 
         <div className="relative mx-auto flex min-h-[calc(88svh-6rem)] w-full max-w-[1800px] flex-col justify-end px-4 pb-12 pt-[calc(6.5rem+env(safe-area-inset-top))] sm:px-6 sm:pb-14 sm:pt-[calc(7.1rem+env(safe-area-inset-top))] lg:px-8 lg:pb-16 lg:pt-[calc(7.8rem+env(safe-area-inset-top))]">
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-end">
-            <div className="max-w-[760px]">
+            <div className="min-w-0 max-w-[760px]">
               <p className="text-[11px] uppercase tracking-[0.34em] text-white/58">{mediaLabel}</p>
 
               {titleLogoEntry?.file_path ? (
@@ -580,7 +580,7 @@ function DetailScreenContent({ mediaType, id }) {
                   alt={title}
                   fetchPriority="high"
                   decoding="async"
-                  className="mt-5 max-h-[108px] w-auto max-w-[min(88vw,560px)] object-contain sm:max-h-[132px] lg:max-h-[164px] lg:max-w-[640px]"
+                  className="mt-5 max-h-[108px] w-auto max-w-full object-contain sm:max-h-[132px] lg:max-h-[164px] lg:max-w-[min(100%,640px)]"
                 />
               ) : (
                 <h1 className="mt-4 font-[family-name:var(--font-display)] text-[2.7rem] font-semibold leading-[0.88] text-white sm:text-[4rem] lg:text-[5.35rem]">
@@ -696,7 +696,7 @@ function DetailScreenContent({ mediaType, id }) {
               {trailerNotice ? <p className="mt-4 text-sm text-white/58">{trailerNotice}</p> : null}
             </div>
 
-            <aside className="self-end xl:justify-self-end xl:max-w-[260px]">
+            <aside className="min-w-0 self-end xl:justify-self-end xl:max-w-[260px]">
               <div className="[text-shadow:0_2px_16px_rgba(0,0,0,0.82)]">
                 <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-white/55">
                   <BarChart3 className="h-3.5 w-3.5 text-accent-200" />
