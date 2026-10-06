@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { HOME_RAILS } from "@/lib/discovery";
-import { isUpcomingMedia, normalizeMediaItem } from "@/lib/media";
-import { formatFullDate } from "@/lib/utils";
+import { normalizeMediaItem } from "@/lib/media";
 import { useTmdbConfiguration } from "@/hooks/use-tmdb-query";
 import { tmdbClientGet } from "@/lib/tmdb-client";
 import { useAppState } from "@/lib/app-state";
@@ -60,29 +59,6 @@ function applyRailMediaType(rail) {
           mediaType: rail.mediaType,
         },
   );
-}
-
-function formatTmdbDate(value) {
-  return value.toISOString().slice(0, 10);
-}
-
-function getReleaseTimestamp(item) {
-  const releaseDate = normalizeMediaItem(item, item?.media_type || item?.mediaType)?.releaseDate;
-
-  if (!releaseDate) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const timestamp = new Date(releaseDate).getTime();
-  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
-}
-
-function hasPosterImage(item) {
-  return Boolean(normalizeMediaItem(item, item?.media_type || item?.mediaType)?.posterPath);
-}
-
-function sortByReleaseDate(items = []) {
-  return [...items].sort((left, right) => getReleaseTimestamp(left) - getReleaseTimestamp(right));
 }
 
 function filterMovieAndTv(items = []) {
@@ -228,41 +204,7 @@ export function HomeScreen() {
       try {
         setLoading(true);
         const responses = await Promise.all(
-          HOME_RAILS.map(async (rail) => {
-            if (rail.key === "upcoming-releases") {
-              const today = new Date();
-              const nextYear = new Date(today);
-              nextYear.setFullYear(today.getFullYear() + 1);
-
-              const [movieUpcoming, tvUpcoming] = await Promise.all([
-                tmdbClientGet("movie/upcoming", {
-                  language: settings.language,
-                  region: settings.region,
-                  page: 1,
-                }),
-                tmdbClientGet("discover/tv", {
-                  language: settings.language,
-                  page: 1,
-                  sort_by: "first_air_date.asc",
-                  "first_air_date.gte": formatTmdbDate(today),
-                  "first_air_date.lte": formatTmdbDate(nextYear),
-                }),
-              ]);
-
-              return {
-                ...rail,
-                data: {
-                  results: [
-                    ...(movieUpcoming?.results || []),
-                    ...((tvUpcoming?.results || []).map((item) => ({
-                      ...item,
-                      mediaType: "tv",
-                    })) || []),
-                  ],
-                },
-              };
-            }
-
+          HOME_RAILS.filter((rail) => rail.key !== "upcoming-releases").map(async (rail) => {
             return {
               ...rail,
               data: await tmdbClientGet(rail.path, {
@@ -312,11 +254,6 @@ export function HomeScreen() {
     const mixedTrending = railEntries["trending-mixed"]?.items || [];
     const trendingMovies = railEntries["trending-movies"]?.items || [];
     const trendingSeries = railEntries["trending-series"]?.items || [];
-    const upcomingReleases = sortByReleaseDate(
-      (railEntries["upcoming-releases"]?.items || []).filter(
-        (item) => isUpcomingMedia(item, item?.media_type || item?.mediaType || "movie") && hasPosterImage(item),
-      ),
-    ).slice(0, 14);
 
     const heroItems = mixedTrending.slice(0, 6);
     const topTenItems = mixedTrending.slice(0, 10);
@@ -341,7 +278,6 @@ export function HomeScreen() {
       topTenItems,
       trendingMoviesItems,
       trendingSeriesItems,
-      upcomingReleases,
       spotlightOne,
       spotlightTwo,
       hiddenRowKeys,
@@ -388,17 +324,6 @@ export function HomeScreen() {
             <PosterRowSkeleton cards={4} />
           </div>
         </RailGroup>
-      )}
-
-      {!loading && !configurationLoading ? (
-        <MediaRail
-          title="Upcoming Releases"
-          items={homeData.upcomingReleases}
-          configuration={configuration}
-          secondaryLabelForItem={(item) => `Releases ${formatFullDate(item.release_date || item.first_air_date)}`}
-        />
-      ) : (
-        <PosterRowSkeleton cards={7} />
       )}
 
       {!loading && !configurationLoading && homeData.spotlightOne ? (

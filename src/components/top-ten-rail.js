@@ -109,7 +109,7 @@ export function TopTenRail({ title = "Top 10", items = [], configuration }) {
             type="button"
             onClick={() => scrollByWholeItems(-1)}
             disabled={!scrollState.canScrollLeft}
-            className="touch-target rounded-full border border-white/10 bg-white/[0.05] p-2 text-white/80 disabled:cursor-not-allowed disabled:opacity-35"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] p-0 text-white/80 disabled:cursor-not-allowed disabled:opacity-35 sm:h-11 sm:w-11"
             aria-label={`Scroll ${title} left`}
           >
             <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -118,7 +118,7 @@ export function TopTenRail({ title = "Top 10", items = [], configuration }) {
             type="button"
             onClick={() => scrollByWholeItems(1)}
             disabled={!scrollState.canScrollRight}
-            className="touch-target rounded-full border border-white/10 bg-white/[0.05] p-2 text-white/80 disabled:cursor-not-allowed disabled:opacity-35"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] p-0 text-white/80 disabled:cursor-not-allowed disabled:opacity-35 sm:h-11 sm:w-11"
             aria-label={`Scroll ${title} right`}
           >
             <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -166,12 +166,6 @@ export function TopTenRail({ title = "Top 10", items = [], configuration }) {
             );
           })}
         </div>
-        <div
-          className={`pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#050507] to-transparent transition-opacity duration-300 sm:w-14 ${
-            scrollState.canScrollRight ? "opacity-90" : "opacity-0"
-          }`}
-          aria-hidden="true"
-        />
       </div>
     </section>
   );

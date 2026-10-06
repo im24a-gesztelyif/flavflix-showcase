@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { AppStateProvider } from "@/lib/app-state";
 import { AppShell } from "@/components/app-shell";
+import { staticAssetUrl } from "@/lib/static-assets";
 
 const bodyFont = Manrope({
   subsets: ["latin"],
@@ -22,9 +23,9 @@ export const metadata = {
   description:
     "A five-minute interactive demonstration of the FlavFlix movie and TV discovery project.",
   icons: {
-    icon: "/flavflix_favicon.png",
-    shortcut: "/flavflix_favicon.png",
-    apple: "/flavflix_favicon.png",
+    icon: staticAssetUrl("/flavflix_favicon.png"),
+    shortcut: staticAssetUrl("/flavflix_favicon.png"),
+    apple: staticAssetUrl("/flavflix_favicon.png"),
   },
 };
 

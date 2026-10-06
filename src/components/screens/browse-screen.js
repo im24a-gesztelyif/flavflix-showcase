@@ -6,22 +6,23 @@ import { FiltersPanel } from "@/components/filters-panel";
 import { PosterGridSkeleton } from "@/components/loading-state";
 import { MediaGrid } from "@/components/media-grid";
 import { EmptyState } from "@/components/empty-state";
-import { PageHeader } from "@/components/page-header";
-import { TmdbAttribution } from "@/components/tmdb-attribution";
+import { UpcomingReleases } from "@/components/upcoming-releases";
 import { useAppState } from "@/lib/app-state";
+import { getBrowseYearParams } from "@/lib/browse-filters";
 import { FULL_GRID_PAGE_SIZE, getLogicalGridPagePlan, getLogicalGridTotalPages, sliceLogicalGridItems } from "@/lib/grid-pagination";
 import { useTmdbConfiguration, useTmdbQuery } from "@/hooks/use-tmdb-query";
 
 const DEFAULT_FILTERS = {
   genre: "",
-  year: "",
+  yearFrom: "",
+  yearTo: "",
   rating: "",
   runtime: "",
   language: "",
   sort: "popularity.desc",
 };
 
-export function BrowseScreen({ mediaType, title, description, sortOptions }) {
+export function BrowseScreen({ mediaType, title, sortOptions }) {
   const { settings } = useAppState();
   const { data: configuration } = useTmdbConfiguration();
   const [filters, setFilters] = useState({
@@ -34,6 +35,11 @@ export function BrowseScreen({ mediaType, title, description, sortOptions }) {
   const discoverPath = mediaType === "movie" ? "discover/movie" : "discover/tv";
   const pagePlan = getLogicalGridPagePlan(page, FULL_GRID_PAGE_SIZE);
   const genreQuery = useTmdbQuery(genrePath, { language: settings.language });
+  const languagesQuery = useTmdbQuery("configuration/languages");
+  const languages = [...(languagesQuery.data || [])]
+    .filter((language) => language.iso_639_1)
+    .sort((left, right) => (left.english_name || left.name || left.iso_639_1).localeCompare(right.english_name || right.name || right.iso_639_1));
+  const yearParams = getBrowseYearParams(mediaType, filters.yearFrom, filters.yearTo);
   const browseQuery = useTmdbQuery(discoverPath, {
     include_adult: false,
     language: settings.language,
@@ -45,9 +51,7 @@ export function BrowseScreen({ mediaType, title, description, sortOptions }) {
     "with_runtime.gte": filters.runtime || undefined,
     with_original_language: filters.language || undefined,
     "vote_count.gte": 75,
-    ...(mediaType === "movie"
-      ? { primary_release_year: filters.year || undefined }
-      : { first_air_date_year: filters.year || undefined }),
+    ...yearParams,
   });
   const browseQueryOverflow = useTmdbQuery(
     discoverPath,
@@ -62,9 +66,7 @@ export function BrowseScreen({ mediaType, title, description, sortOptions }) {
       "with_runtime.gte": filters.runtime || undefined,
       with_original_language: filters.language || undefined,
       "vote_count.gte": 75,
-      ...(mediaType === "movie"
-        ? { primary_release_year: filters.year || undefined }
-        : { first_air_date_year: filters.year || undefined }),
+      ...yearParams,
     },
     {
       enabled: Boolean(pagePlan.secondaryPage),
@@ -90,32 +92,22 @@ export function BrowseScreen({ mediaType, title, description, sortOptions }) {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        eyebrow={mediaType === "movie" ? "Movies" : "TV Shows"}
-        title={title}
-        description={description}
-        action={
-          <TmdbAttribution
-            variant="primaryFull"
-            logoScale={1.08}
-            className="w-full max-w-[430px]"
-            title={`${title} metadata by TMDB`}
-            body={
-              mediaType === "movie"
-                ? "Movie discovery filters, release data, and result metadata on this page come from TMDB."
-                : "TV discovery filters, first-air data, and series metadata on this page come from TMDB."
-            }
-          />
-        }
-      />
-
-      <FiltersPanel
-        genres={genreQuery.data?.genres || []}
-        filters={filters}
-        onChange={handleFilterChange}
-        sortOptions={sortOptions}
-        mediaType={mediaType}
-      />
+      <div className="grid items-center gap-6 lg:grid-cols-[minmax(180px,0.6fr)_minmax(0,2fr)]">
+        <header>
+          <h1 className="text-4xl font-semibold sm:text-5xl">{title}</h1>
+          <p className="mt-3 text-sm text-white/55">Find your next favorite.</p>
+        </header>
+        <FiltersPanel
+          genres={genreQuery.data?.genres || []}
+          languages={languages}
+          filters={filters}
+          onChange={handleFilterChange}
+          sortOptions={sortOptions}
+          mediaType={mediaType}
+          unboxed
+        />
+      </div>
+      <UpcomingReleases mediaType={mediaType} settings={settings} configuration={configuration} />
 
       {error ? (
         <div className="surface p-6 text-sm text-rose-200">TMDB discover failed: {error.message}</div>

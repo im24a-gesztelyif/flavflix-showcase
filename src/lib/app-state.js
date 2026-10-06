@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { createEmptyBucket, DEFAULT_PROFILE_ACCENT, MAX_PROFILES } from "@/lib/account-store";
 import { createMediaActivityKey, createMediaSnapshot, createProgressKey, normalizeProgressMetrics } from "@/lib/media";
 import { DEFAULT_SETTINGS } from "@/lib/storage";
+import { resolveProviderId } from "@/lib/providers";
+import { shouldIncludeInHistory } from "@/lib/watch-history";
 
 const AppStateContext = createContext(null);
 const STORAGE_KEY = "flavflix-showcase-state:v1";
@@ -29,7 +31,7 @@ function normalizeState(value) {
           ...(savedBucket.settings || {}),
           defaultProvider: migrateProviderDefault
             ? DEFAULT_SETTINGS.defaultProvider
-            : savedBucket.settings?.defaultProvider || DEFAULT_SETTINGS.defaultProvider,
+            : resolveProviderId(savedBucket.settings?.defaultProvider),
         },
         loaded: true,
         loading: false,
@@ -103,12 +105,12 @@ export function AppStateProvider({ children }) {
   const createProfile = useCallback(async (name) => {
     const cleanName = String(name || "").trim().slice(0, 30);
     if (!cleanName) throw new Error("Enter a profile name.");
-    let createdId = null;
+    const createdId = globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}`;
     setState((current) => {
       if (current.profiles.length >= MAX_PROFILES) return current;
-      createdId = globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}`;
       const profile = { id: createdId, name: cleanName, accent: DEFAULT_PROFILE_ACCENT, createdAt: new Date().toISOString() };
       return {
+        ...current,
         profiles: [...current.profiles, profile],
         activeProfileId: createdId,
         profileData: { ...current.profileData, [createdId]: createEmptyBucket() },
@@ -132,6 +134,7 @@ export function AppStateProvider({ children }) {
       const profileData = { ...current.profileData };
       delete profileData[profileId];
       return {
+        ...current,
         profiles: current.profiles.filter((profile) => profile.id !== profileId),
         activeProfileId: current.activeProfileId === profileId ? null : current.activeProfileId,
         profileData,
@@ -167,10 +170,11 @@ export function AppStateProvider({ children }) {
   [activeProfileData.saved]);
 
   const recordProgress = useCallback(async (payload) => {
-    if (!activeProfile || !payload?.id || !payload?.mediaType || !payload?.duration) return;
+    if (!activeProfile || !payload?.id || !payload?.mediaType || !Number.isFinite(Number(payload.duration)) || Number(payload.duration) <= 0) return;
     updateProfileBucket(activeProfile.id, (current) => {
       const key = createProgressKey(payload);
-      const metrics = normalizeProgressMetrics(payload);
+      const snapshot = payload.snapshot ? createMediaSnapshot(payload.snapshot, payload.mediaType) : current.progress[key]?.snapshot || null;
+      const metrics = normalizeProgressMetrics({ ...payload, snapshot });
       const entry = {
         key,
         id: Number(payload.id),
@@ -183,9 +187,9 @@ export function AppStateProvider({ children }) {
         watchedComplete: metrics.watchedComplete,
         provider: payload.provider || current.settings.defaultProvider,
         updatedAt: new Date().toISOString(),
-        snapshot: payload.snapshot ? createMediaSnapshot(payload.snapshot, payload.mediaType) : current.progress[key]?.snapshot || null,
+        snapshot,
       };
-      return { ...current, progress: { ...current.progress, [key]: entry }, history: updateHistory(current.history, entry) };
+      return { ...current, progress: { ...current.progress, [key]: entry }, history: shouldIncludeInHistory(entry) ? updateHistory(current.history, entry) : current.history };
     });
   }, [activeProfile, updateProfileBucket]);
 

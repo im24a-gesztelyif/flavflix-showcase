@@ -3,7 +3,7 @@ import { BrandLogo } from "@/components/brand-logo";
 
 export function LoadingState({
   title = "Loading",
-  description = "Pulling in metadata and local profile state.",
+  description = "Pulling in metadata and local profile data.",
   fullScreen = false,
   brand = false,
 }) {

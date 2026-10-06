@@ -6,25 +6,23 @@ import {
   BarChart3,
   Bookmark,
   BookmarkCheck,
-  Building2,
   CalendarClock,
-  ChevronDown,
-  ChevronUp,
+  CheckCircle2,
   Clock3,
   Layers3,
   Play,
+  Plus,
   Star,
   Trash2,
   Trophy,
   X,
 } from "lucide-react";
 import { AppLink } from "@/components/app-link";
-import { LoadingState } from "@/components/loading-state";
 import { MediaRail } from "@/components/media-rail";
 import { useAppState } from "@/lib/app-state";
 import { createProgressKey, getWatchHref, isPlayableMedia } from "@/lib/media";
+import { parseAwardsSummary } from "@/lib/awards";
 import { omdbClientGet } from "@/lib/omdb-client";
-import { tmdbAwardsClientGet } from "@/lib/tmdb-awards-client";
 import { useTmdbConfiguration, useTmdbQuery } from "@/hooks/use-tmdb-query";
 import { buildImageUrl, buildPosterUrl, formatFullDate, formatRuntime, formatVote } from "@/lib/utils";
 
@@ -39,10 +37,6 @@ function pickTrailer(videos = []) {
 function toProgressPercent(progressEntry) {
   const normalized = Number(progressEntry?.percent || 0);
   return Math.max(0, Math.min(100, Math.round(normalized * 100)));
-}
-
-function formatInteger(value) {
-  return new Intl.NumberFormat("en-US").format(Number(value || 0));
 }
 
 function formatOmdbVotes(value) {
@@ -118,102 +112,72 @@ function pickPreferredTmdbImage(entries = [], language) {
   );
 }
 
-function AwardsPanel({ awards, loading = false }) {
-  const [open, setOpen] = useState(false);
-  const hasAwardItems = Boolean(awards?.items?.length);
-  const hasAwardTotals = Number(awards?.wins || 0) > 0 || Number(awards?.nominations || 0) > 0;
+function AwardsPanel({ summary }) {
+  const awards = parseAwardsSummary(summary);
 
-  if (!awards || (!hasAwardItems && !hasAwardTotals)) {
+  if (!awards) {
     return null;
   }
 
   return (
-    <section className="surface relative overflow-hidden p-4 sm:p-5">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,212,84,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.07),transparent_42%)]" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f1cf67]/50 to-transparent" />
+    <section className="surface relative overflow-hidden !border-[#f1cf67]/35">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_8%_0%,rgba(241,207,103,0.15),transparent_30%),radial-gradient(circle_at_96%_100%,rgba(255,255,255,0.06),transparent_38%)]"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f1cf67]/55 to-transparent"
+        aria-hidden="true"
+      />
 
-      <div className="relative">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 max-w-2xl">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#f1cf67]/20 bg-[#f1cf67]/10 text-[#f1cf67] shadow-[0_0_32px_rgba(241,207,103,0.14)]">
-              <Trophy className="h-4.5 w-4.5" />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold text-white sm:text-[1.45rem]">Awards</h2>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] uppercase tracking-[0.2em] text-white/42">
-                {loading ? "Checking" : `${awards?.items?.length || 0} entries`}
-              </span>
-            </div>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-white/56">
-              {loading
-                ? "Looking for award data from TMDB."
-                : hasAwardItems
-                  ? "Award highlights from TMDB."
-                  : "Award totals are available, but TMDB does not include ceremony details yet."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setOpen((current) => !current)}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-white/82 transition hover:bg-white/[0.07]"
-            aria-expanded={open}
-          >
-            {open ? "Hide Awards" : "Show Awards"}
-            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/74">
-            <span className="mr-2 text-[11px] uppercase tracking-[0.2em] text-white/38">Wins</span>
-            <span className="font-semibold text-white">{loading ? "..." : formatInteger(awards?.wins)}</span>
-          </div>
-          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/74">
-            <span className="mr-2 text-[11px] uppercase tracking-[0.2em] text-white/38">Nominations</span>
-            <span className="font-semibold text-white">{loading ? "..." : formatInteger(awards?.nominations)}</span>
+      <div className="relative flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#f1cf67]/20 bg-[#f1cf67]/10 text-[#f1cf67] shadow-[0_0_28px_rgba(241,207,103,0.12)]">
+            <Trophy className="h-[18px] w-[18px]" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-lg font-semibold text-white sm:text-xl">Awards</p>
           </div>
         </div>
 
-        {open ? (
-          <div className="mt-4 space-y-4">
-            {hasAwardItems ? (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {awards.items.slice(0, 6).map((award, index) => (
-                  <article
-                    key={`${award.ceremony}-${award.category}-${index}`}
-                    className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
-                      <span
-                        className={`rounded-full px-2.5 py-1 font-semibold ${
-                          award.result === "Winner" ? "bg-[#0f8f55]/25 text-[#92ffcb]" : "bg-white/[0.07] text-white/68"
-                        }`}
-                      >
-                        {award.result}
-                      </span>
-                      {award.year ? <span className="rounded-full border border-white/10 px-2.5 py-1">{award.year}</span> : null}
-                    </div>
-                    <h3 className="mt-3 text-lg font-semibold text-white">{award.category}</h3>
-                    <p className="mt-1.5 text-sm text-white/55">{award.ceremony}</p>
-                    {award.recipients?.length ? (
-                      <p className="mt-3 text-sm leading-6 text-white/62">
-                        {award.recipients.length === 1 ? "Recipient" : "Recipients"}: {award.recipients.join(", ")}
-                      </p>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/58">
-                TMDB lists award totals for this title, but detailed award entries are not available yet.
-              </div>
-            )}
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
+          {awards.oscars !== null ? (
+            <span className="rounded-full border border-[#f1cf67]/30 bg-[#f1cf67]/10 px-3 py-1.5 text-sm text-white/76">
+              <span className="mr-2 text-[10px] uppercase tracking-[0.2em] text-[#f1cf67]/72">Oscars</span>
+              <strong className="font-semibold text-white">{awards.oscars.toLocaleString("en-US")}</strong>
+            </span>
+          ) : null}
+          {awards.wins !== null ? (
+            <span className="rounded-full border border-[#f1cf67]/20 bg-[#f1cf67]/[0.045] px-3 py-1.5 text-sm text-white/76">
+              <span className="mr-2 text-[10px] uppercase tracking-[0.2em] text-white/38">Wins</span>
+              <strong className="font-semibold text-white">{awards.wins.toLocaleString("en-US")}</strong>
+            </span>
+          ) : null}
+          {awards.nominations !== null ? (
+            <span className="rounded-full border border-[#f1cf67]/20 bg-[#f1cf67]/[0.045] px-3 py-1.5 text-sm text-white/76">
+              <span className="mr-2 text-[10px] uppercase tracking-[0.2em] text-white/38">Nominations</span>
+              <strong className="font-semibold text-white">{awards.nominations.toLocaleString("en-US")}</strong>
+            </span>
+          ) : null}
+        </div>
       </div>
     </section>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div role="status" aria-label="Loading details" className="space-y-8 motion-safe:animate-pulse">
+      <div className="flex min-h-[70svh] flex-col justify-end gap-5 pb-8">
+        <div className="h-24 w-2/3 max-w-lg rounded bg-white/10" />
+        <div className="h-5 w-48 rounded bg-white/10" />
+        <div className="h-20 w-full max-w-2xl rounded bg-white/5" />
+        <div className="h-12 w-64 rounded bg-white/10" />
+      </div>
+      <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+        {[0, 1, 2, 3].map((key) => <div key={key} className="aspect-video rounded bg-white/5" />)}
+      </div>
+    </div>
   );
 }
 
@@ -257,24 +221,57 @@ function OmdbRatingsPanel({ payload, loading, error, compact = false }) {
   );
 }
 
-export function DetailScreen({ mediaType, id }) {
-  const { settings, isSaved, toggleSaved, activeProfileData, clearMediaActivity } = useAppState();
+function EpisodeRatingsLine({ payload, loading, error }) {
+  const ratings = normalizeOmdbRatings(payload);
+
+  if (loading) {
+    return <p className="text-xs text-white/40">Ratings loading...</p>;
+  }
+
+  if (error || !ratings.length) {
+    return <p className="text-xs text-white/35">Ratings unavailable</p>;
+  }
+
+  return (
+    <div className="scrollbar-none flex items-center gap-3 overflow-x-auto whitespace-nowrap text-xs text-white/48" aria-label="Episode ratings">
+      {ratings.map((rating, index) => (
+        <span key={rating.source} className="inline-flex shrink-0 items-baseline gap-1.5">
+          {index > 0 ? <span className="mr-1 text-white/20" aria-hidden="true">&middot;</span> : null}
+          <span>{rating.label}</span>
+          <strong className="font-semibold text-white/82">{rating.value}</strong>
+          {rating.votes ? <span className="text-white/32">({rating.votes})</span> : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function DetailScreen(props) {
+  return <DetailScreenContent key={`${props.mediaType}:${props.id}`} {...props} />;
+}
+
+function DetailScreenContent({ mediaType, id }) {
+  const { settings, isSaved, toggleSaved, activeProfileData, clearMediaActivity, recordProgress } = useAppState();
   const [trailerOpen, setTrailerOpen] = useState(false);
   const [trailerNotice, setTrailerNotice] = useState("");
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [omdbDetail, setOmdbDetail] = useState(null);
   const [omdbDetailLoading, setOmdbDetailLoading] = useState(false);
   const [omdbDetailError, setOmdbDetailError] = useState("");
-  const [awardsDetail, setAwardsDetail] = useState(null);
-  const [awardsLoading, setAwardsLoading] = useState(false);
   const [episodeRatings, setEpisodeRatings] = useState({});
+  const [visibleCastCount, setVisibleCastCount] = useState(8);
+  const [castScrollState, setCastScrollState] = useState({
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
   const trailerCloseButtonRef = useRef(null);
   const selectedSeasonTouchedRef = useRef(false);
+  const castHighlightsRef = useRef(null);
   const { data: configuration } = useTmdbConfiguration();
   const detailPath = `${mediaType}/${id}`;
   const detailQuery = useTmdbQuery(detailPath, {
     language: settings.language,
-    append_to_response: "credits,images,videos,recommendations,similar,external_ids",
+    append_to_response: `credits,images,videos,recommendations,similar,external_ids,${mediaType === "movie" ? "release_dates" : "content_ratings"}`,
   });
   const titleImagesQuery = useTmdbQuery(
     `${mediaType}/${id}/images`,
@@ -348,6 +345,48 @@ export function DetailScreen({ mediaType, id }) {
   }, [trailerOpen]);
 
   useEffect(() => {
+    const element = castHighlightsRef.current;
+    if (!element || !detail?.credits?.cast?.length) {
+      return undefined;
+    }
+
+    let frameId = null;
+
+    function updateState() {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        const nextCanScrollLeft = element.scrollLeft > 8;
+        const nextCanScrollRight = element.scrollWidth > element.clientWidth + 8 && element.scrollLeft + element.clientWidth < element.scrollWidth - 8;
+
+        setCastScrollState((current) =>
+          current.canScrollLeft === nextCanScrollLeft && current.canScrollRight === nextCanScrollRight
+            ? current
+            : {
+                canScrollLeft: nextCanScrollLeft,
+                canScrollRight: nextCanScrollRight,
+              },
+        );
+      });
+    }
+
+    updateState();
+    element.addEventListener("scroll", updateState, { passive: true });
+    window.addEventListener("resize", updateState);
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      element.removeEventListener("scroll", updateState);
+      window.removeEventListener("resize", updateState);
+    };
+  }, [detail?.credits?.cast?.length, visibleCastCount]);
+
+  useEffect(() => {
     let cancelled = false;
 
     if (!omdbLookupId) {
@@ -381,35 +420,6 @@ export function DetailScreen({ mediaType, id }) {
   }, [omdbLookupId]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    setAwardsDetail(null);
-    setAwardsLoading(true);
-
-    tmdbAwardsClientGet({
-      mediaType,
-      id,
-      language: "en-US",
-    })
-      .then((data) => {
-        if (!cancelled) {
-          setAwardsDetail(data);
-          setAwardsLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAwardsDetail(null);
-          setAwardsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id, mediaType]);
-
-  useEffect(() => {
     if (mediaType !== "tv" || !seasonOptions.length) {
       return;
     }
@@ -431,75 +441,30 @@ export function DetailScreen({ mediaType, id }) {
   }, [mediaType, resumeEntry?.season, seasonOptions, selectedSeason]);
 
   useEffect(() => {
-    if (mediaType !== "tv" || !omdbLookupId || !selectedSeasonEpisodes.length) {
+    if (!omdbLookupId || mediaType !== "tv" || !selectedSeasonEpisodes.length) {
       return undefined;
     }
 
     let cancelled = false;
-    const ratingKeys = selectedSeasonEpisodes.map((episode) => `${selectedSeason}:${episode.episode_number}`);
+    const lookups = selectedSeasonEpisodes.map((episode) => {
+      const key = `${omdbLookupId}:${selectedSeason}:${episode.episode_number}`;
+      setEpisodeRatings((current) => current[key] ? current : { ...current, [key]: { loading: true } });
 
-    setEpisodeRatings((current) => {
-      const next = { ...current };
-
-      selectedSeasonEpisodes.forEach((episode) => {
-        const key = `${selectedSeason}:${episode.episode_number}`;
-
-        if (!next[key]?.data && !next[key]?.loading) {
-          next[key] = {
-            loading: true,
-            data: null,
-            error: "",
-          };
-        }
-      });
-
-      return next;
-    });
-
-    Promise.allSettled(
-      selectedSeasonEpisodes.map((episode) =>
-        omdbClientGet({
-          imdbId: omdbLookupId,
-          season: selectedSeason,
-          episode: episode.episode_number,
-        }),
-      ),
-    ).then((results) => {
-      if (cancelled) {
-        return;
-      }
-
-      setEpisodeRatings((current) => {
-        const next = { ...current };
-
-        results.forEach((result, index) => {
-          const key = ratingKeys[index];
-
-          next[key] =
-            result.status === "fulfilled"
-              ? {
-                  loading: false,
-                  data: result.value,
-                  error: "",
-                }
-              : {
-                  loading: false,
-                  data: null,
-                  error: result.reason?.message || "OMDb ratings are unavailable for this episode.",
-                };
+      return omdbClientGet({ imdbId: omdbLookupId, season: selectedSeason, episode: episode.episode_number })
+        .then((data) => {
+          if (!cancelled) setEpisodeRatings((current) => ({ ...current, [key]: { data, loading: false } }));
+        })
+        .catch(() => {
+          if (!cancelled) setEpisodeRatings((current) => ({ ...current, [key]: { loading: false, error: "Ratings unavailable." } }));
         });
-
-        return next;
-      });
     });
 
-    return () => {
-      cancelled = true;
-    };
+    Promise.allSettled(lookups);
+    return () => { cancelled = true; };
   }, [mediaType, omdbLookupId, selectedSeason, selectedSeasonEpisodes]);
 
   if (detailQuery.loading && !detailQuery.data) {
-    return <LoadingState title="Loading details" description="Fetching canonical metadata, recommendations, and cast." />;
+    return <DetailSkeleton />;
   }
 
   if (detailQuery.error || !detailQuery.data) {
@@ -513,7 +478,20 @@ export function DetailScreen({ mediaType, id }) {
   const title = mediaType === "movie" ? detail.title : detail.name;
   const saved = isSaved(id, mediaType);
   const collection = collectionQuery.data || detail.belongs_to_collection || null;
-  const productionCompanies = detail.production_companies || [];
+  const productionCompanies = (detail.production_companies || []).filter((company) => company.logo_path).slice(0, 2);
+  const directors = Array.from(new Map((detail.credits?.crew || []).filter((person) => person.job === "Director").map((person) => [person.id, person])).values());
+  const certificationEntries = mediaType === "movie" ? detail.release_dates?.results : detail.content_ratings?.results;
+  const certificationFor = (region) => {
+    const entry = certificationEntries?.find((item) => item.iso_3166_1 === region);
+    return mediaType === "movie" ? entry?.release_dates?.find((release) => release.certification)?.certification : entry?.rating;
+  };
+  const ageRating = certificationFor(settings.region) || certificationFor("US");
+  const runtime = detail.runtime || detail.episode_run_time?.[0] || detail.last_episode_to_air?.runtime;
+  const movieProgress = mediaType === "movie"
+    ? activeProfileData.progress?.[createProgressKey({ mediaType: "movie", id })]
+    : null;
+  const movieWatched = Boolean(movieProgress?.watchedComplete || Number(movieProgress?.percent) >= 0.9);
+  const money = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
   const watchHref =
     mediaType === "tv"
       ? getWatchHref(mediaType, id, {
@@ -531,9 +509,14 @@ export function DetailScreen({ mediaType, id }) {
     detail.images?.backdrops?.[0]?.file_path ||
     detail.poster_path;
   const titleLogoEntry = pickPreferredTmdbImage(titleImagesQuery.data?.logos || [], settings.language);
-  const castSummary = detail.credits?.cast?.slice(0, 3).map((person) => person.name).join(", ");
   const genreSummary = detail.genres?.map((genre) => genre.name).join(", ");
   const mediaLabel = mediaType === "movie" ? "Film" : "Series";
+  const today = new Date().toISOString().slice(0, 10);
+  const releasedSeasonEpisodes = selectedSeasonEpisodes.filter((episode) => episode.air_date && episode.air_date <= today);
+  const seasonWatched = Boolean(releasedSeasonEpisodes.length) && releasedSeasonEpisodes.every((episode) => {
+    const entry = activeProfileData.progress?.[createProgressKey({ mediaType: "tv", id, season: selectedSeason, episode: episode.episode_number })];
+    return entry?.watchedComplete || Number(entry?.percent) >= 0.9;
+  });
 
   function openTrailer() {
     if (!trailerEmbedUrl) {
@@ -545,20 +528,43 @@ export function DetailScreen({ mediaType, id }) {
     setTrailerOpen(true);
   }
 
+  function markMovieWatched() {
+    const duration = Math.max(1, Number(runtime) || 1) * 60;
+    recordProgress({ id, mediaType: "movie", currentTime: duration, duration, percent: 1, snapshot: detail });
+  }
+
+  function markEpisodeWatched(episode) {
+    const duration = Math.max(1, Number(episode.runtime || runtime) || 1) * 60;
+    recordProgress({
+      id,
+      mediaType: "tv",
+      season: selectedSeason,
+      episode: episode.episode_number,
+      currentTime: duration,
+      duration,
+      percent: 1,
+      snapshot: detail,
+    });
+  }
+
+  function markSeasonWatched() {
+    releasedSeasonEpisodes.forEach(markEpisodeWatched);
+  }
+
   return (
     <div className="space-y-8">
       <section className="relative left-1/2 right-1/2 -mx-[50vw] -mt-24 w-screen overflow-hidden sm:-mt-28">
         {heroBackdrop ? (
           <>
             <div
-              className="absolute inset-0 bg-cover bg-center opacity-80"
+              className="absolute inset-0 bg-cover bg-center opacity-95"
               style={{
                 backgroundImage: `url(${buildImageUrl(heroBackdrop, "original", configuration)})`,
                 WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 72%, rgba(0,0,0,0) 100%)",
                 maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 72%, rgba(0,0,0,0) 100%)",
               }}
             />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,0.96)_0%,rgba(5,5,7,0.84)_26%,rgba(5,5,7,0.48)_52%,rgba(5,5,7,0.12)_76%,rgba(5,5,7,0)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,0.88)_0%,rgba(5,5,7,0.70)_26%,rgba(5,5,7,0.34)_52%,rgba(5,5,7,0.12)_76%,rgba(5,5,7,0)_100%)]" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,0.14)_0%,rgba(5,5,7,0.06)_24%,rgba(5,5,7,0.18)_58%,rgba(5,5,7,0)_100%)]" />
           </>
         ) : null}
@@ -583,20 +589,28 @@ export function DetailScreen({ mediaType, id }) {
               )}
 
               <div className="mt-5 flex flex-wrap items-center gap-2.5 text-sm text-white/74">
-                <span className="rounded-full border border-white/10 bg-black/26 px-3 py-1.5">{dateLabel}</span>
-                {detail.runtime || detail.episode_run_time?.[0] ? (
-                  <span className="rounded-full border border-white/10 bg-black/26 px-3 py-1.5">
-                    {formatRuntime(detail.runtime || detail.episode_run_time?.[0])}
+                <span className="text-white/80">{dateLabel}</span>
+                {runtime ? (
+                  <span className="text-white/80">
+                    {formatRuntime(runtime)}
                   </span>
                 ) : null}
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/26 px-3 py-1.5">
+                <span className="inline-flex items-center gap-1.5">
                   <Star className="h-4 w-4 text-yellow-300" />
                   {formatVote(detail.vote_average)}
                 </span>
+                {ageRating ? (
+                  <span
+                    title={`Age rating (${certificationFor(settings.region) ? settings.region : "US"})`}
+                    className="inline-flex min-w-7 items-center justify-center rounded-[4px] border border-white/70 bg-black/20 px-1.5 py-0.5 text-[11px] font-extrabold leading-none tracking-[0.04em] text-white/90"
+                  >
+                    {ageRating}
+                  </span>
+                ) : null}
                 {collection ? (
                   <AppLink
                     href={`/collection/${collection.id}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/26 px-3 py-1.5 text-white/82 transition hover:bg-white/[0.08]"
+                    className="inline-flex items-center gap-2 text-white/82 transition hover:text-white"
                   >
                     <Layers3 className="h-4 w-4" />
                     {collection.name}
@@ -635,6 +649,17 @@ export function DetailScreen({ mediaType, id }) {
                   {saved ? <BookmarkCheck className="h-4 w-4 text-accent-300" /> : <Bookmark className="h-4 w-4" />}
                   {saved ? "Saved" : "Save to My List"}
                 </button>
+                {mediaType === "movie" && playable && !hasTrackedActivity ? (
+                  <button
+                    type="button"
+                    onClick={markMovieWatched}
+                    disabled={movieWatched}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white/85 transition-colors hover:bg-white/10 disabled:cursor-default disabled:border-emerald-300/20 disabled:bg-emerald-400/10 disabled:text-emerald-200 sm:px-5"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {movieWatched ? "Watched" : "Mark watched"}
+                  </button>
+                ) : null}
                 {hasTrackedActivity ? (
                   <button
                     type="button"
@@ -655,9 +680,10 @@ export function DetailScreen({ mediaType, id }) {
               </div>
 
               <div className="mt-6 space-y-2 text-sm text-white/64">
-                {castSummary ? (
-                  <p>
-                    <span className="text-white/42">Starring:</span> {castSummary}
+                {directors.length ? (
+                  <p className="flex flex-wrap gap-x-2">
+                    <span className="text-white/42">Director:</span>
+                    {directors.map((person) => <AppLink key={person.id} href={`/person/${person.id}`} className="hover:text-white hover:underline">{person.name}</AppLink>)}
                   </p>
                 ) : null}
                 {genreSummary ? (
@@ -682,6 +708,29 @@ export function DetailScreen({ mediaType, id }) {
                   compact
                   error={omdbDetailError || (!omdbLookupId ? "TMDB did not expose an IMDb ID for this title." : "")}
                 />
+              </div>
+              {mediaType === "movie" && (detail.budget > 0 || detail.revenue > 0) ? (
+                <div className="mt-6 space-y-2 border-t border-white/10 pt-4 text-sm [text-shadow:0_2px_12px_black]">
+                  <p className="text-xs uppercase tracking-widest text-white/55">Box Office</p>
+                  {detail.budget > 0 ? <p className="flex justify-between gap-4"><span className="text-white/60">Budget</span>{money(detail.budget)}</p> : null}
+                  {detail.revenue > 0 ? <p className="flex justify-between gap-4"><span className="text-white/60">Revenue</span>{money(detail.revenue)}</p> : null}
+                </div>
+              ) : null}
+              <div className="mt-6 flex flex-wrap items-center gap-5">
+                {productionCompanies.map((company) => (
+                  <AppLink
+                    key={company.id}
+                    href={`/company/${company.id}`}
+                    aria-label={company.name}
+                    className="group flex h-14 w-24 items-center justify-center rounded bg-transparent p-2 transition-colors duration-200 hover:bg-[#d8d1c4]/90 focus-visible:bg-[#d8d1c4]/90"
+                  >
+                    <img
+                      src={buildImageUrl(company.logo_path, "w300", configuration)}
+                      alt={company.name}
+                      className="max-h-full max-w-full object-contain opacity-95 brightness-0 invert transition duration-200 group-hover:brightness-100 group-hover:invert-0 group-hover:opacity-100 group-focus-visible:brightness-100 group-focus-visible:invert-0 group-focus-visible:opacity-100"
+                    />
+                  </AppLink>
+                ))}
               </div>
             </aside>
           </div>
@@ -709,17 +758,17 @@ export function DetailScreen({ mediaType, id }) {
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-white/40">Collection</p>
                 <h2 className="mt-3 text-2xl font-semibold text-white">{collection.name}</h2>
+                {collectionQuery.data?.parts?.length ? (
+                  <p className="mt-2 text-lg text-white/80">
+                    {collectionQuery.data.parts.length} films in collection
+                  </p>
+                ) : null}
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
                   {collection.overview || "Part of a larger story. Open the full collection to see every connected chapter."}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3 text-sm text-white/72">
-                {collectionQuery.data?.parts?.length ? (
-                  <span className="rounded-full border border-white/10 px-3 py-1">
-                    {collectionQuery.data.parts.length} films in collection
-                  </span>
-                ) : null}
                 <AppLink
                   href={`/collection/${collection.id}`}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 font-semibold text-black"
@@ -734,237 +783,77 @@ export function DetailScreen({ mediaType, id }) {
       ) : null}
 
       {mediaType === "tv" && seasonOptions.length ? (
-        <section className="surface p-5 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <section className="py-6">
+          <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold text-white">Season Guide</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-7 text-white/58">
-                Choose a season, then browse every episode with TMDB synopses, stills, air dates, runtimes, and ratings.
-              </p>
+              <h2 className="text-2xl font-semibold">Episodes</h2>
+              <p className="mt-2 text-sm text-white/50">{selectedSeasonEpisodes.length} episodes</p>
             </div>
-            <label className="flex w-full flex-col gap-2 text-sm text-white/55 sm:max-w-[240px]">
-              <span>Season</span>
-              <select
-                value={selectedSeason}
-                onChange={(event) => {
-                  selectedSeasonTouchedRef.current = true;
-                  setSelectedSeason(Number(event.target.value));
-                }}
-                className="brand-select"
-              >
-                {seasonOptions.map((season) => (
-                  <option key={season.id} value={season.season_number}>
-                    Season {season.season_number}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-3 text-sm">
+                <span className="sr-only">Season</span>
+                <select className="brand-select max-w-[240px]" value={selectedSeason} onChange={(event) => { selectedSeasonTouchedRef.current = true; setSelectedSeason(Number(event.target.value)); }}>
+                  {seasonOptions.map((season) => <option key={season.id} value={season.season_number}>{season.name}</option>)}
+                </select>
+              </label>
+              {releasedSeasonEpisodes.length ? (
+                <button
+                  type="button"
+                  onClick={markSeasonWatched}
+                  disabled={seasonWatched}
+                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.05] text-white/70 transition-colors hover:border-accent-300/35 hover:bg-accent-500/15 hover:text-white disabled:cursor-default disabled:border-emerald-300/20 disabled:bg-emerald-400/10 disabled:text-emerald-200"
+                  aria-label={seasonWatched ? "Season watched" : `Mark ${selectedSeasonData?.name || `season ${selectedSeason}`} watched`}
+                  title={seasonWatched ? "Season watched" : "Mark season watched"}
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                </button>
+              ) : null}
+            </div>
           </div>
-
-          {selectedSeasonData ? (
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-white/10 bg-black/22">
-              <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <div className="relative aspect-[16/10] overflow-hidden bg-black lg:aspect-auto lg:min-h-[244px]">
-                  <img
-                    src={buildImageUrl(
-                      selectedSeasonData.poster_path || selectedSeasonData.episodes?.[0]?.still_path || detail.backdrop_path,
-                      "w780",
-                      configuration,
-                    )}
-                    alt={selectedSeasonData.name || `Season ${selectedSeason}`}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent" />
-                </div>
-
-                <div className="space-y-4 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.24em] text-white/45">Selected Season</p>
-                      <h3 className="mt-2 text-xl font-semibold text-white sm:text-[1.4rem]">
-                        {selectedSeasonData.name || `Season ${selectedSeason}`}
-                      </h3>
-                    </div>
-                    {playable ? (
-                      <AppLink
-                        href={getWatchHref("tv", id, {
-                          season: selectedSeason,
-                          episode: resumeEntry?.season === selectedSeason ? resumeEntry.episode || 1 : 1,
-                        })}
-                        className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black"
-                      >
-                        <Play className="h-4 w-4 fill-current" />
-                        {resumeEntry?.season === selectedSeason ? "Resume Season" : "Play Season"}
-                      </AppLink>
-                    ) : (
-                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-semibold text-white/62">
-                        <CalendarClock className="h-4 w-4" />
-                        Unavailable before release
+          {seasonQuery.error ? <p role="alert">Episodes could not be loaded. Please try again.</p> : null}
+          <div className="grid gap-x-6 gap-y-9 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {seasonQuery.loading || !selectedSeasonData ? [0, 1, 2, 3].map((key) => <div key={key} className="aspect-video animate-pulse rounded-lg bg-white/5" />) : selectedSeasonEpisodes.map((episode) => {
+              const progress = activeProfileData.progress?.[createProgressKey({ mediaType: "tv", id, season: selectedSeason, episode: episode.episode_number })];
+              const percent = toProgressPercent(progress);
+              const rating = episodeRatings[`${omdbLookupId}:${selectedSeason}:${episode.episode_number}`];
+              const episodePlayable = playable && Boolean(episode.air_date) && episode.air_date <= today;
+              return (
+                <article key={episode.id || episode.episode_number} className="group min-w-0">
+                  <AppLink href={episodePlayable ? getWatchHref("tv", id, { season: selectedSeason, episode: episode.episode_number }) : "#"} aria-label={`${episodePlayable ? "Watch" : "Upcoming"} episode ${episode.episode_number}: ${episode.name}`} onClick={(event) => { if (!episodePlayable) event.preventDefault(); }} className="relative block aspect-video overflow-hidden rounded-lg bg-white/5">
+                    <img src={buildImageUrl(episode.still_path || detail.backdrop_path, "w780", configuration)} alt="" loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:brightness-75" />
+                    {episodePlayable ? <Play className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 fill-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100" /> : null}
+                    {percent > 0 ? (
+                      <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/55" aria-label={`${percent}% watched`}>
+                        <div className="h-full bg-accent-500" style={{ width: `${percent}%` }} />
                       </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-white/58">
-                    <span className="rounded-full border border-white/10 px-3 py-1">
-                      {selectedSeasonData.episodes?.length || selectedSeasonData.episode_count || 0} episodes
-                    </span>
-                    {selectedSeasonData.air_date ? (
-                      <span className="rounded-full border border-white/10 px-3 py-1">
-                        Premiered {formatFullDate(selectedSeasonData.air_date)}
-                      </span>
+                    ) : null}
+                  </AppLink>
+                  <div className="mt-4 flex items-start justify-between gap-3">
+                    <h3 className="min-w-0 text-lg font-semibold">{episode.episode_number}. {episode.name}</h3>
+                    {episodePlayable ? (
+                      <button
+                        type="button"
+                        onClick={() => markEpisodeWatched(episode)}
+                        disabled={percent >= 90}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-accent-300/25 bg-accent-500/10 px-3 py-1.5 text-xs font-semibold text-accent-100 transition-colors hover:border-accent-300/45 hover:bg-accent-500/20 disabled:cursor-default disabled:border-emerald-300/20 disabled:bg-emerald-400/10 disabled:text-emerald-200"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {percent >= 90 ? "Watched" : "Mark watched"}
+                      </button>
                     ) : null}
                   </div>
-
-                  <p className="text-sm leading-7 text-white/66">
-                    {selectedSeasonData.overview || "No season synopsis is available from TMDB for this season yet."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : seasonQuery.loading ? (
-            <div className="mt-6 overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.03] p-6">
-              <div className="h-6 w-48 animate-pulse rounded-full bg-white/[0.08]" />
-              <div className="mt-4 h-4 w-full animate-pulse rounded-full bg-white/[0.06]" />
-              <div className="mt-3 h-4 w-5/6 animate-pulse rounded-full bg-white/[0.06]" />
-            </div>
-          ) : null}
-
-          <div className="mt-6 h-[2px] rounded-full bg-gradient-to-r from-transparent via-white/55 to-transparent shadow-[0_0_18px_rgba(255,255,255,0.12)] lg:hidden" />
-
-          <div className="mt-6 space-y-4">
-            {seasonQuery.loading && !selectedSeasonEpisodes.length
-              ? Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03]">
-                    <div className="aspect-[16/7] animate-pulse bg-white/[0.06]" />
-                    <div className="space-y-3 p-5">
-                      <div className="h-5 w-2/3 animate-pulse rounded-full bg-white/[0.08]" />
-                      <div className="h-4 w-full animate-pulse rounded-full bg-white/[0.06]" />
-                      <div className="h-4 w-4/5 animate-pulse rounded-full bg-white/[0.06]" />
-                    </div>
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/60">{episode.overview || "Synopsis coming soon."}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/65">
+                    {episode.vote_average > 0 ? <span className="flex items-center gap-1"><Star className="h-3 w-3 text-amber-300" />{formatVote(episode.vote_average)}</span> : null}
+                    {episode.runtime ? <span>{formatRuntime(episode.runtime)}</span> : null}
+                    {episode.air_date ? <span>{formatFullDate(episode.air_date)}</span> : null}
                   </div>
-                ))
-              : selectedSeasonEpisodes.map((episode) => {
-                  const episodeProgress = activeProfileData.progress?.[
-                    createProgressKey({
-                      mediaType: "tv",
-                      id,
-                      season: selectedSeason,
-                      episode: episode.episode_number,
-                    })
-                  ];
-                  const progressPercent = toProgressPercent(episodeProgress);
-                  const episodeWatchHref = getWatchHref("tv", id, {
-                    season: selectedSeason,
-                    episode: episode.episode_number,
-                  });
-
-                  return (
-                    <article
-                      key={episode.id || episode.episode_number}
-                      className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] sm:rounded-[28px]"
-                    >
-                      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-                        <div className="relative aspect-[16/9] overflow-hidden bg-black/45 lg:aspect-auto lg:h-full">
-                          <img
-                            src={buildImageUrl(episode.still_path || detail.backdrop_path, "w780", configuration)}
-                            alt={`${title} episode ${episode.episode_number}`}
-                            loading="lazy"
-                            decoding="async"
-                            className="h-full w-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/58 to-transparent" />
-                        </div>
-
-                        <div className="space-y-4 p-5 sm:p-6">
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.22em] text-white/45">
-                                Episode {episode.episode_number}
-                              </p>
-                              <h3 className="mt-2 text-xl font-semibold text-white">
-                                {episode.name || `Episode ${episode.episode_number}`}
-                              </h3>
-                            </div>
-
-                            {playable ? (
-                              <div className="flex flex-wrap items-center justify-end gap-2">
-                                <AppLink
-                                  href={episodeWatchHref}
-                                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white/84 transition hover:bg-white/[0.08]"
-                                >
-                                  <Play className="h-4 w-4 fill-current" />
-                                  {episodeProgress ? "Resume" : "Play"}
-                                </AppLink>
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white/58">
-                                <CalendarClock className="h-4 w-4" />
-                                Unavailable
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-white/58">
-                            {episode.air_date ? (
-                              <span className="rounded-full border border-white/10 px-3 py-1">
-                                {formatFullDate(episode.air_date)}
-                              </span>
-                            ) : null}
-                            {formatRuntime(episode.runtime) ? (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1">
-                                <Clock3 className="h-3.5 w-3.5" />
-                                {formatRuntime(episode.runtime)}
-                              </span>
-                            ) : null}
-                            {episode.vote_average ? (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1">
-                                <Star className="h-3.5 w-3.5 text-yellow-300" />
-                                {formatVote(episode.vote_average)}
-                              </span>
-                            ) : null}
-                            {episodeProgress ? (
-                              <span className="rounded-full border border-white/10 px-3 py-1">
-                                {Math.round(episodeProgress.percent * 100)}% watched
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <p className="text-sm leading-7 text-white/66">
-                            {episode.overview || "No episode synopsis is available from TMDB for this episode yet."}
-                          </p>
-
-                          {progressPercent > 0 ? (
-                            <div className="pt-1">
-                              <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                                <div
-                                  className="h-full rounded-full bg-[#ff2749]/90"
-                                  style={{ width: `${progressPercent}%` }}
-                                />
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {omdbLookupId ? (
-                            <div className="max-w-sm pt-1">
-                              <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-white/44">
-                                <BarChart3 className="h-3.5 w-3.5" />
-                                OMDb Ratings
-                              </div>
-                              <OmdbRatingsPanel
-                                payload={episodeRatings[`${selectedSeason}:${episode.episode_number}`]?.data}
-                                loading={episodeRatings[`${selectedSeason}:${episode.episode_number}`]?.loading}
-                                error={episodeRatings[`${selectedSeason}:${episode.episode_number}`]?.error}
-                                compact
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                  {omdbLookupId ? (
+                    <div className="mt-3"><EpisodeRatingsLine payload={rating?.data} loading={rating?.loading} error={rating?.error} /></div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -972,66 +861,52 @@ export function DetailScreen({ mediaType, id }) {
       {detail.credits?.cast?.length ? (
         <section className="surface p-5 sm:p-6">
           <h2 className="text-2xl font-semibold text-white">Cast Highlights</h2>
-          <div className="mt-5 grid gap-4 grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
-            {detail.credits.cast.slice(0, 8).map((person) => (
-              <AppLink
-                key={person.credit_id || person.id}
-                href={`/person/${person.id}`}
-                className="rounded-[28px] border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]"
-              >
-                <p className="text-lg font-semibold text-white">{person.name}</p>
-                <p className="mt-2 text-sm text-white/55">{person.character || person.known_for_department}</p>
-              </AppLink>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <AwardsPanel awards={awardsDetail} loading={awardsLoading} />
-
-      {productionCompanies.length ? (
-        <section className="surface p-5 sm:p-6">
-          <div className="mb-5">
-            <h2 className="text-2xl font-semibold text-white">Production Companies</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-white/58">
-              Studios and banners attached to this title through TMDB, each linked into its own company page.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {productionCompanies.map((company) => (
-              <AppLink
-                key={company.id}
-                href={`/company/${company.id}`}
-                className="group rounded-[26px] border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] border border-[#d8d1c4]/20 bg-[#d8d1c4] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-                    {company.logo_path ? (
-                      <img
-                        src={buildImageUrl(company.logo_path, "w300", configuration)}
-                        alt={company.name}
-                        loading="lazy"
-                        decoding="async"
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <Building2 className="h-6 w-6 text-white/44" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="line-clamp-1 text-lg font-semibold text-white">{company.name}</p>
-                    <p className="mt-2 text-sm text-white/55">
-                      {company.origin_country ? `Origin country: ${company.origin_country}` : "Open company profile"}
-                    </p>
-                  </div>
+          <div className="relative">
+            <div
+              ref={castHighlightsRef}
+              className="scrollbar-none mt-5 flex gap-5 overflow-x-auto pb-3"
+            >
+              {detail.credits.cast.slice(0, visibleCastCount).map((person) => (
+                <AppLink
+                  key={person.credit_id || person.id}
+                  href={`/person/${person.id}`}
+                  className="w-32 shrink-0 sm:w-40"
+                >
+                  <img src={buildImageUrl(person.profile_path, "w185", configuration)} alt="" loading="lazy" className="mb-3 aspect-[2/3] w-full rounded-lg object-cover bg-white/5" />
+                  <p className="text-base font-semibold text-white">{person.name}</p>
+                  <p className="mt-2 text-sm text-white/55">{person.character || person.known_for_department}</p>
+                </AppLink>
+              ))}
+              {visibleCastCount < detail.credits.cast.length ? (
+                <div className="flex w-20 shrink-0 items-center justify-center self-stretch">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCastCount((current) => Math.min(current + 8, detail.credits.cast.length))}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-white/[0.05] text-white/70 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    aria-label="Show 8 more cast members"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
                 </div>
-              </AppLink>
-            ))}
+              ) : null}
+            </div>
+            <div
+              className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[#050507] via-[#050507]/80 to-transparent transition-opacity duration-200 sm:w-10 ${
+                castScrollState.canScrollLeft ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden="true"
+            />
+            <div
+              className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[#050507] via-[#050507]/80 to-transparent transition-opacity duration-200 sm:w-10 ${
+                castScrollState.canScrollRight ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden="true"
+            />
           </div>
         </section>
       ) : null}
+
+      <AwardsPanel summary={omdbDetail?.Awards} />
 
       <MediaRail
         title="Recommended Next"
@@ -1049,8 +924,16 @@ export function DetailScreen({ mediaType, id }) {
 
       {trailerOpen ? (
         <div className="fixed inset-0 z-[120] isolate !m-0 flex items-center justify-center">
-          <div className="absolute inset-0 bg-[#03050780]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(120,150,190,0.12),transparent_52%)] backdrop-blur-xl" />
+          <div
+            className="absolute inset-0 bg-[#03050780]"
+            onClick={() => setTrailerOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(120,150,190,0.12),transparent_52%)] backdrop-blur-xl"
+            onClick={() => setTrailerOpen(false)}
+            aria-hidden="true"
+          />
           <button
             ref={trailerCloseButtonRef}
             type="button"
@@ -1061,7 +944,10 @@ export function DetailScreen({ mediaType, id }) {
             <X className="h-5 w-5" />
           </button>
 
-          <div className="relative z-10 w-full max-w-[1120px] px-4 py-8 sm:px-6 sm:py-10">
+          <div
+            className="relative z-10 w-full max-w-[1120px] px-4 py-8 sm:px-6 sm:py-10"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="aspect-video overflow-hidden rounded-[22px] bg-black shadow-[0_28px_90px_rgba(0,0,0,0.48)]">
               {trailerEmbedUrl ? (
                 <iframe

@@ -30,6 +30,7 @@ import { MAX_PROFILES } from "@/lib/account-store";
 import { PRIMARY_NAV_ITEMS, USER_MENU_ITEMS } from "@/lib/discovery";
 import { useAppState } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
+import { staticAssetUrl } from "@/lib/static-assets";
 
 const ICONS = {
   "/": House,
@@ -132,7 +133,7 @@ function IntroOverlay({ onFinish }) {
       <div className="flex h-full w-full items-center justify-center">
         <video
           ref={videoRef}
-          src="/flavflix_primary_intro.mov"
+          src={staticAssetUrl("/flavflix_primary_intro.mov")}
           autoPlay
           muted
           playsInline
@@ -536,11 +537,27 @@ function ProfileGate({ profiles, onSelect, onCreate, onUpdate, onRemove }) {
 function UserMenu({ onChangeProfile }) {
   const { activeProfile } = useAppState();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event) => {
+      if (!menuRef.current?.contains(event.target)) setOpen(false);
+    };
+    const dismissEscape = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("keydown", dismissEscape);
+    };
+  }, [open]);
   const desktopItems = USER_MENU_ITEMS;
   const mobileItems = MOBILE_MENU_ITEMS;
 
   return (
-    <div className="relative">
+    <div ref={menuRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

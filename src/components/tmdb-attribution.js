@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { staticAssetUrl } from "@/lib/static-assets";
 
 const LOGO_MAP = {
   primaryFull: {
@@ -58,7 +59,7 @@ export function TmdbAttribution({
       <div className="flex shrink-0 items-center justify-center rounded-2xl border border-[#256874]/40 bg-black/18 px-2.5 py-2 sm:px-3">
         <div className="relative shrink-0" style={{ width: `${scaledWidth}px`, height: `${scaledHeight}px` }}>
           <Image
-            src={logo.src}
+            src={staticAssetUrl(logo.src)}
             alt="TMDB"
             fill
             unoptimized

@@ -19,11 +19,14 @@ FlavFlix Showcase is the public, interactive demonstration of my private FlavFli
 - Save titles and maintain local watch history, progress, preferences, and continue-watching rows
 - Open film and episode playback through embedded third-party sources
 - Switch between available playback sources when necessary
+- Explore redesigned title details, random picks, award filters, and upcoming releases
+- Demonstrate intro skips and next-episode credits controls when third-party playback data is available
 - Use the responsive desktop and mobile interface
 
 ## The five-minute preview
 
 Each movie or TV episode receives a maximum five-minute preview in this showcase.
+The cumulative preview budget is stored per local profile and title/episode, survives page reloads and source switches, and removes the embedded player when exhausted. This is a browser-side demonstration limit, not a server-side access-control system. Clearing browser storage resets local showcase data.
 This showcase is meant for demonstration purposes only.
 
 ## Disclaimer

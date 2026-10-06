@@ -1,4 +1,5 @@
 import { formatYear } from "@/lib/utils";
+import { getFinalEpisode, isTitleComplete } from "@/lib/watch-history";
 
 export function detectMediaType(item, fallbackType) {
   if (fallbackType === "movie" || fallbackType === "tv") {
@@ -112,6 +113,7 @@ export function createMediaSnapshot(item, fallbackType) {
     voteAverage: normalized.voteAverage,
     runtime: normalized.runtime,
     releaseDate: normalized.releaseDate,
+    ...(normalized.mediaType === "tv" ? { finalEpisode: getFinalEpisode(item) } : {}),
   };
 }
 
@@ -173,11 +175,19 @@ export function shouldShowInContinueWatching(entry) {
     return false;
   }
 
+  if (entry.mediaType === "tv") {
+    return !isTitleComplete(entry);
+  }
+
+  if (entry.watchedComplete) {
+    return false;
+  }
+
   if (!Number.isFinite(percent)) {
     return true;
   }
 
-  return entry.mediaType === "tv" || percent < 0.9;
+  return percent < 0.9;
 }
 
 export function getDetailHref(mediaType, id) {

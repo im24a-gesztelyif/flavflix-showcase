@@ -5,9 +5,15 @@ import { ArrowLeft, Check, ChevronRight, Info, Menu, Plus, PlayCircle, SkipForwa
 import { AppLink } from "@/components/app-link";
 import { LoadingState } from "@/components/loading-state";
 import { PlayerShell } from "@/components/player-shell";
+import { IntroSkipButton } from "@/components/intro-skip-button";
+import { CreditsNextEpisode } from "@/components/credits-next-episode";
 import { useAppState } from "@/lib/app-state";
-import { buildProviderUrl, getProviderMetadata, getProviderOrder, resolveProviderId } from "@/lib/providers";
+import { buildProviderSeekCommand, buildProviderUrl, getProviderMetadata, getProviderOrder, resolveProviderId } from "@/lib/providers";
 import { createProgressKey, findEpisodeAfter, getWatchHref, isPlayableMedia } from "@/lib/media";
+import { resolvePlaybackFraction } from "@/lib/playback-progress";
+import { readProviderMessage, resolveProviderProgress } from "@/lib/provider-events";
+import { bindPlayerFullscreenControls, getFullscreenElement, togglePlayerFullscreen } from "@/lib/player-fullscreen";
+import { getButtonConfig, getFullscreenButtonStyle, getHeaderButtonStyle } from "@/lib/button-config";
 import { useTmdbQuery } from "@/hooks/use-tmdb-query";
 import { buildImageUrl, buildPosterUrl, cn, formatRuntime, formatSeconds } from "@/lib/utils";
 
@@ -36,29 +42,9 @@ function syncUrl({ mediaType, id, providerId, season, episode }) {
   window.history.replaceState({}, "", href);
 }
 
-function isFormElement(target) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
-}
-
 function normalizeEpisodeNumber(value, fallback) {
   const normalizedValue = Number(value);
   return Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : fallback;
-}
-
-function isSameEpisodePosition(leftSeason, leftEpisode, rightSeason, rightEpisode) {
-  return Number(leftSeason) === Number(rightSeason) && Number(leftEpisode) === Number(rightEpisode);
-}
-
-function compareEpisodePosition(leftSeason, leftEpisode, rightSeason, rightEpisode) {
-  if (Number(leftSeason) !== Number(rightSeason)) {
-    return Number(leftSeason) - Number(rightSeason);
-  }
-
-  return Number(leftEpisode) - Number(rightEpisode);
 }
 
 function toProgressPercent(progressEntry) {
@@ -66,177 +52,30 @@ function toProgressPercent(progressEntry) {
   return Math.max(0, Math.min(100, Math.round(normalized * 100)));
 }
 
-function normalizeMediaId(value, fallback) {
-  const normalizedValue = Number(value);
-  return Number.isFinite(normalizedValue) && normalizedValue > 0 ? normalizedValue : fallback;
-}
-
-function normalizeProgressTime(value) {
-  const normalizedValue = Number(value);
-  return Number.isFinite(normalizedValue) && normalizedValue >= 0 ? normalizedValue : undefined;
-}
-
-function parseVideasyNestedData(data) {
-  if (typeof data === "string") {
-    try {
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
-  }
-
-  return data && typeof data === "object" ? data : null;
-}
-
-function pickVideasyRecord(records, requestedId, requestedMediaType) {
-  if (!records || typeof records !== "object") {
-    return null;
-  }
-
-  const recordEntries = Object.values(records).filter((entry) => entry && typeof entry === "object");
-
-  return (
-    recordEntries.find(
-      (entry) =>
-        normalizeMediaId(entry.id, 0) === Number(requestedId) &&
-        String(entry.mediaType || "").toLowerCase() === String(requestedMediaType || "").toLowerCase(),
-    ) || null
-  );
-}
-
-function resolveVideasyShowProgressEntry(record, requestedSeason, requestedEpisode) {
-  if (!record?.show_progress || typeof record.show_progress !== "object") {
-    return null;
-  }
-
-  const directKey = `s${Number(requestedSeason)}e${Number(requestedEpisode)}`;
-
-  if (record.show_progress[directKey]) {
-    return record.show_progress[directKey];
-  }
-
-  const lastSeason = normalizeEpisodeNumber(record.last_season_watched, requestedSeason);
-  const lastEpisode = normalizeEpisodeNumber(record.last_episode_watched, requestedEpisode);
-  const fallbackKey = `s${lastSeason}e${lastEpisode}`;
-
-  if (record.show_progress[fallbackKey]) {
-    return record.show_progress[fallbackKey];
-  }
-
-  const progressEntries = Object.values(record.show_progress).filter((entry) => entry && typeof entry === "object");
-
-  if (!progressEntries.length) {
-    return null;
-  }
-
-  return (
-    progressEntries.sort(
-      (left, right) => Number(right.last_updated || 0) - Number(left.last_updated || 0),
-    )[0] || null
-  );
-}
-
-function extractVideasyPayload(data, context = {}) {
-  let payload = data;
-
-  if (typeof payload === "string") {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-
-  if (payload.type === "MEDIA_DATA") {
-    const records = parseVideasyNestedData(payload.data);
-    const record = pickVideasyRecord(records, context.id, context.mediaType);
-
-    if (!record) {
-      return null;
-    }
-
-    const episodeProgressEntry =
-      record.mediaType === "tv"
-        ? resolveVideasyShowProgressEntry(record, context.season || 1, context.episode || 1)
-        : null;
-    const rawProgress =
-      episodeProgressEntry?.progress && typeof episodeProgressEntry.progress === "object"
-        ? episodeProgressEntry.progress
-        : record.progress && typeof record.progress === "object"
-          ? record.progress
-          : null;
-
-    if (!rawProgress) {
-      return null;
-    }
-
-    return {
-      id: record.id,
-      mediaType: record.mediaType,
-      season: episodeProgressEntry?.season ?? record.last_season_watched,
-      episode: episodeProgressEntry?.episode ?? record.last_episode_watched,
-      currentTime: normalizeProgressTime(rawProgress.watched ?? rawProgress.timestamp ?? rawProgress.currentTime ?? rawProgress.time) ?? 0,
-      duration: normalizeProgressTime(rawProgress.duration ?? rawProgress.total ?? rawProgress.length) ?? 0,
-      progressPercent:
-        normalizeProgressTime(rawProgress.watched ?? rawProgress.currentTime ?? rawProgress.time) !== undefined &&
-        normalizeProgressTime(rawProgress.duration ?? rawProgress.total ?? rawProgress.length) > 0
-          ? (Number(rawProgress.watched ?? rawProgress.currentTime ?? rawProgress.time) /
-              Number(rawProgress.duration ?? rawProgress.total ?? rawProgress.length)) *
-            100
-          : Number(rawProgress.progress ?? payload.progress),
-    };
-  }
-
-  const progressPercent = Number(payload.progress);
-  let currentTime = normalizeProgressTime(payload.timestamp ?? payload.currentTime ?? payload.time);
-  let duration = normalizeProgressTime(payload.duration ?? payload.total ?? payload.length);
-
-  if ((!duration || duration <= 0) && currentTime !== undefined && Number.isFinite(progressPercent) && progressPercent > 0) {
-    duration = currentTime / (progressPercent / 100);
-  }
-
-  if (currentTime === undefined && duration !== undefined && Number.isFinite(progressPercent) && progressPercent >= 0) {
-    currentTime = duration * (progressPercent / 100);
-  }
-
-  if (currentTime === undefined && duration === undefined) {
-    return null;
-  }
-
-  return {
-    id: payload.id,
-    mediaType: payload.type,
-    season: payload.season,
-    episode: payload.episode,
-    currentTime: currentTime ?? 0,
-    duration: duration ?? 0,
-    progressPercent: Number.isFinite(progressPercent) ? progressPercent : undefined,
-  };
-}
-
 const CONTROL_IDLE_DELAY = 3000;
-const SHOWCASE_PREVIEW_SECONDS = 5 * 60;
 
 export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, initialProvider }) {
   const { settings, recordProgress, activeProfile, activeProfileData, isSaved, toggleSaved } = useAppState();
+  const recordProgressRef = useRef(recordProgress);
+  recordProgressRef.current = recordProgress;
   const initialSeasonNumber = initialSeason ? Number(initialSeason) : 1;
   const initialEpisodeNumber = initialEpisode ? Number(initialEpisode) : 1;
-  const [providerId, setProviderId] = useState(resolveProviderId(initialProvider || settings.defaultProvider || "videasy"));
+  const [providerId, setProviderId] = useState(resolveProviderId(initialProvider || settings.defaultProvider || "cinesrc"));
   const [season, setSeason] = useState(initialSeasonNumber);
   const [episode, setEpisode] = useState(initialEpisodeNumber);
   const [displaySeason, setDisplaySeason] = useState(initialSeasonNumber);
   const [displayEpisode, setDisplayEpisode] = useState(initialEpisodeNumber);
   const [episodeDisplayName, setEpisodeDisplayName] = useState(null);
   const [nextEpisodePromptVisible, setNextEpisodePromptVisible] = useState(false);
+  const [introPlayback, setIntroPlayback] = useState(null);
+  const introPlaybackRef = useRef(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [watchHubMode, setWatchHubMode] = useState("episodes");
   const [hubSeason, setHubSeason] = useState(initialSeasonNumber);
   const [hubEpisode, setHubEpisode] = useState(initialEpisodeNumber);
   const [navigationPending, setNavigationPending] = useState(false);
+  const [fullscreenActive, setFullscreenActive] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState("");
   const [playbackSeed, setPlaybackSeed] = useState({
     key: "",
     resumeTime: undefined,
@@ -249,16 +88,14 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   const hubEpisodeButtonRefs = useRef(new Map());
   const lastProgressFlushRef = useRef(0);
   const lastProgressPayloadRef = useRef(null);
+  const lastPlaybackMetricsRef = useRef(null);
   const controlsHideTimerRef = useRef(null);
   const displayStateRef = useRef({
     season: initialSeasonNumber,
     episode: initialEpisodeNumber,
   });
-  const providerSyncGuardRef = useRef({
-    season: initialSeasonNumber,
-    episode: initialEpisodeNumber,
-    at: 0,
-  });
+  const resumeAppliedRef = useRef("");
+  const liveProgressKeyRef = useRef("");
 
   const detailQuery = useTmdbQuery(`${mediaType}/${id}`, {
     language: settings.language,
@@ -285,10 +122,15 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   );
 
   const progressKey = createProgressKey({ mediaType, id, season, episode });
-  const previewStorageKey = `flavflix-showcase-preview:${activeProfile?.id || "visitor"}:${progressKey}`;
-  const [previewSecondsLeft, setPreviewSecondsLeft] = useState(SHOWCASE_PREVIEW_SECONDS);
   const resumeEntry = activeProfileData.progress?.[progressKey];
-  const providerOrder = getProviderOrder(settings, providerId);
+  const displayedProgressKey = createProgressKey({
+    mediaType,
+    id,
+    season: displaySeason,
+    episode: displayEpisode,
+  });
+  const displayedProgress = activeProfileData.progress?.[displayedProgressKey];
+  const providerOrder = getProviderOrder();
   const seasonData = useMemo(
     () => (mediaType === "tv" && seasonQuery.data?.season_number === Number(displaySeason) ? seasonQuery.data : null),
     [displaySeason, mediaType, seasonQuery.data],
@@ -302,8 +144,15 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     hubEpisodes[0] ||
     currentEpisode ||
     null;
-  const nextEpisode = findEpisodeAfter(seasonEpisodes, displayEpisode);
   const detail = detailQuery.data;
+  const nextInSeason = findEpisodeAfter(seasonEpisodes, displayEpisode);
+  const nextSeasonNumber = detail?.seasons?.filter((item) => item.season_number > Number(displaySeason) && item.episode_count > 0)
+    .sort((a, b) => a.season_number - b.season_number)[0]?.season_number;
+  const nextSeasonQuery = useTmdbQuery(`tv/${id}/season/${nextSeasonNumber}`, { language: settings.language }, {
+    enabled: mediaType === "tv" && Boolean(seasonData) && !nextInSeason && Boolean(nextSeasonNumber),
+  });
+  const nextCandidate = nextInSeason || (nextSeasonQuery.data?.season_number === nextSeasonNumber ? nextSeasonQuery.data?.episodes?.[0] : null);
+  const nextEpisode = nextCandidate?.air_date && nextCandidate.air_date <= new Date().toISOString().slice(0, 10) ? nextCandidate : null;
   const title = mediaType === "movie" ? detail?.title : detail?.name;
   const titleLabel =
     mediaType === "tv"
@@ -317,55 +166,30 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     [detail?.seasons],
   );
 
-  useEffect(() => {
-    const usedSeconds = Math.max(0, Number(window.localStorage.getItem(previewStorageKey) || 0));
-    setPreviewSecondsLeft(Math.max(0, SHOWCASE_PREVIEW_SECONDS - usedSeconds));
-
-    if (usedSeconds >= SHOWCASE_PREVIEW_SECONDS) return undefined;
-
-    const timer = window.setInterval(() => {
-      setPreviewSecondsLeft((current) => {
-        const next = Math.max(0, current - 1);
-        window.localStorage.setItem(previewStorageKey, String(SHOWCASE_PREVIEW_SECONDS - next));
-        return next;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [previewStorageKey]);
-
   const focusPlayer = useCallback(() => {
     window.setTimeout(() => {
-      iframeRef.current?.focus();
+      iframeRef.current?.focus({ preventScroll: true });
     }, 0);
   }, []);
 
-  function releaseControlFocus(event) {
-    event.currentTarget.blur();
+  async function toggleFlavflixFullscreen() {
+    setFullscreenError("");
+    try {
+      await togglePlayerFullscreen(playerRootRef.current);
+    } catch {
+      setFullscreenError("Fullscreen isn't available in this browser.");
+    }
     focusPlayer();
   }
+  const toggleFullscreenRef = useRef(toggleFlavflixFullscreen);
+  toggleFullscreenRef.current = toggleFlavflixFullscreen;
 
-  async function toggleFlavflixFullscreen() {
-    const target = playerRootRef.current;
-    const requestFullscreen = target?.requestFullscreen || target?.webkitRequestFullscreen || target?.msRequestFullscreen;
-    const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
-    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+  useEffect(() => bindPlayerFullscreenControls({
+    onToggle: () => { void toggleFullscreenRef.current(); },
+  }), []);
 
-    if (!target || !requestFullscreen) {
-      return;
-    }
-
-    try {
-      if (fullscreenElement === target) {
-        await exitFullscreen?.call(document);
-      } else {
-        await requestFullscreen.call(target);
-      }
-    } catch {
-      // Provider fullscreen can still fail on browser/platform policy; keep playback uninterrupted.
-    }
-
-    revealControls(CONTROL_IDLE_DELAY);
+  function releaseControlFocus(event) {
+    event.currentTarget.blur();
     focusPlayer();
   }
 
@@ -409,71 +233,6 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     setEpisodeDisplayName(nextName);
   }
 
-  function resetProviderSyncGuard(nextSeason, nextEpisode) {
-    providerSyncGuardRef.current = {
-      season: Number(nextSeason),
-      episode: Number(nextEpisode),
-      at: 0,
-    };
-  }
-
-  function syncObservedEpisode(nextSeason, nextEpisode, nextName = null) {
-    if (mediaType !== "tv") {
-      return;
-    }
-
-    const normalizedSeason = normalizeEpisodeNumber(nextSeason, displayStateRef.current.season || season || 1);
-    const normalizedEpisode = normalizeEpisodeNumber(nextEpisode, displayStateRef.current.episode || episode || 1);
-    const currentDisplayState = displayStateRef.current;
-
-    if (
-      isSameEpisodePosition(
-        normalizedSeason,
-        normalizedEpisode,
-        currentDisplayState.season,
-        currentDisplayState.episode,
-      )
-    ) {
-      if (nextName) {
-        setEpisodeDisplayName((current) => (current === nextName ? current : nextName));
-      }
-
-      return;
-    }
-
-    const compareResult = compareEpisodePosition(
-      normalizedSeason,
-      normalizedEpisode,
-      currentDisplayState.season,
-      currentDisplayState.episode,
-    );
-    const guardState = providerSyncGuardRef.current;
-    const guardIsActive = guardState.at > 0 && Date.now() - guardState.at < 8000;
-
-    if (compareResult < 0 && guardIsActive) {
-      return;
-    }
-
-    providerSyncGuardRef.current = {
-      season: normalizedSeason,
-      episode: normalizedEpisode,
-      at: Date.now(),
-    };
-
-    setNextEpisodePromptVisible(false);
-    updateDisplayState(normalizedSeason, normalizedEpisode, nextName);
-    syncUrl({
-      mediaType,
-      id,
-      providerId,
-      season: normalizedSeason,
-      episode: normalizedEpisode,
-    });
-  }
-
-  const syncObservedEpisodeRef = useRef(syncObservedEpisode);
-  syncObservedEpisodeRef.current = syncObservedEpisode;
-
   function advanceToEpisode(nextSeason, nextEpisodeNumber, nextEpisodeData) {
     const normalizedSeason = normalizeEpisodeNumber(nextSeason, displayStateRef.current.season || 1);
     const normalizedEpisode = normalizeEpisodeNumber(nextEpisodeNumber, displayStateRef.current.episode || 1);
@@ -481,7 +240,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     setSeason(normalizedSeason);
     setEpisode(normalizedEpisode);
     updateDisplayState(normalizedSeason, normalizedEpisode, nextEpisodeData?.name || null);
-    resetProviderSyncGuard(normalizedSeason, normalizedEpisode);
+
     setNextEpisodePromptVisible(false);
     syncUrl({
       mediaType,
@@ -511,7 +270,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   }, []);
 
   useEffect(() => {
-    setProviderId(resolveProviderId(initialProvider || settings.defaultProvider || "vidlink"));
+    setProviderId(resolveProviderId(initialProvider || settings.defaultProvider || "cinesrc"));
   }, [initialProvider, settings.defaultProvider]);
 
   useEffect(() => {
@@ -525,7 +284,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
       setSeason(nextSeason);
       setEpisode(nextEpisode);
       updateDisplayState(nextSeason, nextEpisode);
-      resetProviderSyncGuard(nextSeason, nextEpisode);
+
     }
   }, [id, initialEpisode, initialSeason, mediaType]);
 
@@ -539,16 +298,16 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
         setSeason(latestTvProgress.season || 1);
         setEpisode(latestTvProgress.episode || 1);
         updateDisplayState(latestTvProgress.season || 1, latestTvProgress.episode || 1);
-        resetProviderSyncGuard(latestTvProgress.season || 1, latestTvProgress.episode || 1);
+
       }
     }
   }, [activeProfileData.progress, id, initialEpisode, initialSeason, mediaType]);
 
   useEffect(() => {
-    if (!["vidlink", "cinesrc", "videasy"].includes(providerId) || mediaType !== "tv" || !nextEpisode) {
+    if (!getProviderMetadata(providerId).supportsProgress || mediaType !== "tv") {
       setNextEpisodePromptVisible(false);
     }
-  }, [mediaType, nextEpisode, providerId]);
+  }, [mediaType, providerId]);
 
   useEffect(() => {
     if (mediaType !== "tv" || !seasonEpisodes.length) {
@@ -590,10 +349,21 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
       return;
     }
 
+    resumeAppliedRef.current = "";
+    liveProgressKeyRef.current = "";
+    lastPlaybackMetricsRef.current = null;
     setPlaybackSeed({
       key: seedKey,
-      resumeTime: ["vidlink", "cinesrc", "videasy"].includes(providerId) ? resumeEntry?.currentTime : undefined,
+      resumeTime: resumeEntry?.currentTime,
     });
+    const pendingProgress = lastProgressPayloadRef.current;
+    if (pendingProgress) {
+      recordProgressRef.current({
+        ...pendingProgress,
+        currentTime: pendingProgress.currentTime ?? pendingProgress.watched,
+      });
+      lastProgressPayloadRef.current = null;
+    }
     lastProgressFlushRef.current = 0;
   }, [playbackSeed.key, progressKey, providerId, resumeEntry?.currentTime]);
 
@@ -627,7 +397,8 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
 
   useEffect(() => {
     function handleFullscreenChange() {
-      const nextFullscreenActive = Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      const nextFullscreenActive = Boolean(getFullscreenElement());
+      setFullscreenActive(nextFullscreenActive);
 
       if (nextFullscreenActive) {
         setPanelOpen(false);
@@ -721,6 +492,11 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
 
       lastProgressPayloadRef.current = {
         ...payload,
+        id: Number(id),
+        mediaType: payload.mediaType || mediaType,
+        season: payload.season || displayStateRef.current.season,
+        episode: payload.episode || displayStateRef.current.episode,
+        snapshot: detail,
         provider: sourceProvider,
       };
 
@@ -731,10 +507,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
       lastProgressFlushRef.current = now;
 
       recordProgress({
-        id: normalizeMediaId(payload.tmdbId ?? payload.mtmdbId ?? payload.id, id),
-        mediaType: payload.mediaType || mediaType,
-        season: payload.season || season,
-        episode: payload.episode || episode,
+        ...lastProgressPayloadRef.current,
         currentTime: payload.currentTime ?? payload.watched,
         duration: payload.duration,
         provider: sourceProvider,
@@ -743,201 +516,61 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     }
 
     function handleMessage(event) {
-      const isVidLinkMessage = providerId === "vidlink" && event.origin === "https://vidlink.pro";
-      const isCineSrcMessage = providerId === "cinesrc" && event.origin === "https://cinesrc.st";
-      const isVideasyMessage = providerId === "videasy" && event.origin === "https://player.videasy.net";
+      const payload = readProviderMessage(event, {
+        providerId,
+        id,
+        mediaType,
+        season,
+        episode,
+      }, iframeRef.current?.contentWindow);
+      if (!payload) return;
 
-      if (!isVidLinkMessage && !isCineSrcMessage && !isVideasyMessage) {
+      if (payload.event === "nextepisode") {
+        const nextData = payload.season === Number(season)
+          ? seasonEpisodes.find((item) => item.episode_number === payload.episode) : null;
+        advanceToEpisodeRef.current(payload.season, payload.episode, nextData || null);
         return;
       }
 
-      if (isVidLinkMessage && event.data?.type === "PLAYER_EVENT") {
-        const payload = event.data.data;
-        const currentTime = Number(payload.currentTime ?? payload.watched ?? 0);
-        const duration = Number(payload.duration ?? 0);
-        const availableNextEpisode = nextEpisodeRef.current;
-        const shouldShowNextEpisodePrompt =
-          mediaType === "tv" &&
-          providerId === "vidlink" &&
-          Boolean(availableNextEpisode) &&
-          (payload.event === "ended" || (duration > 0 && currentTime / duration >= 0.9));
-
-        setNextEpisodePromptVisible((current) =>
-          current === shouldShowNextEpisodePrompt ? current : shouldShowNextEpisodePrompt,
+      // VidLove resumes via a live command once the current video reports a duration.
+      const seedKey = `${providerId}:${progressKey}`;
+      if (payload.cached && liveProgressKeyRef.current === seedKey) return;
+      if (!payload.cached && payload.duration > 0 && Number.isFinite(payload.currentTime)) {
+        liveProgressKeyRef.current = seedKey;
+      }
+      if (providerId === "vidlove" && !payload.cached && playbackSeed.key === seedKey &&
+          resumeAppliedRef.current !== seedKey && Number(playbackSeed.resumeTime) > 15 &&
+          payload.duration > 0 && ["play", "timeupdate", "playerstatus"].includes(payload.event)) {
+        resumeAppliedRef.current = seedKey;
+        iframeRef.current.contentWindow.postMessage(
+          { type: "SET_TIME", time: Math.min(Math.floor(playbackSeed.resumeTime), payload.duration - 1) },
+          getProviderMetadata(providerId).origin,
         );
+        return;
+      }
 
-        flushProgress(payload, {
-          force: payload.event === "pause" || payload.event === "ended" || payload.event === "seeked",
-          provider: "vidlink",
+      const progress = resolveProviderProgress(payload, lastPlaybackMetricsRef.current);
+      const fraction = resolvePlaybackFraction(progress || { event: payload.event });
+
+      if (mediaType === "tv" && fraction !== null) {
+        setNextEpisodePromptVisible(fraction >= 0.9);
+      }
+      if (progress) {
+        lastPlaybackMetricsRef.current = progress;
+        flushProgress(progress, {
+          force: ["pause", "ended", "seeked"].includes(payload.event),
+          provider: providerId,
         });
-
-        if (
-          payload.event === "ended" &&
-          mediaType === "tv" &&
-          autoplayNextEpisodeRef.current &&
-          availableNextEpisode
-        ) {
-          advanceToEpisodeRef.current(
-            displayStateRef.current.season,
-            availableNextEpisode.episode_number,
-            availableNextEpisode,
-          );
-        }
       }
 
-      if (isVidLinkMessage && event.data?.type === "MEDIA_DATA") {
-        const payload = event.data.data;
-        const payloadSeason = normalizeEpisodeNumber(payload.lastSeason, displayStateRef.current.season || season || 1);
-        const payloadEpisode = normalizeEpisodeNumber(
-          payload.lastEpisode,
-          displayStateRef.current.episode || episode || 1,
-        );
-
-        if (mediaType === "tv" && (payload.lastSeason || payload.lastEpisode)) {
-          const syncedEpisode =
-            payloadSeason === Number(displaySeason)
-              ? seasonEpisodes.find((item) => item.episode_number === Number(payloadEpisode))
-              : null;
-
-          syncObservedEpisodeRef.current(payloadSeason, payloadEpisode, syncedEpisode?.name || null);
-        }
-      }
-
-      if (isCineSrcMessage && typeof event.data === "object" && event.data) {
-        if (event.data.type === "cinesrc:timeupdate") {
-          const currentTime = normalizeProgressTime(event.data.currentTime) ?? 0;
-          const duration = normalizeProgressTime(event.data.duration) ?? 0;
-          const availableNextEpisode = nextEpisodeRef.current;
-          const shouldShowNextEpisodePrompt =
-            mediaType === "tv" &&
-            providerId === "cinesrc" &&
-            Boolean(availableNextEpisode) &&
-            duration > 0 &&
-            currentTime / duration >= 0.9;
-
-          setNextEpisodePromptVisible((current) =>
-            current === shouldShowNextEpisodePrompt ? current : shouldShowNextEpisodePrompt,
-          );
-
-          flushProgress(
-            {
-              id,
-              mediaType,
-              season: displayStateRef.current.season,
-              episode: displayStateRef.current.episode,
-              currentTime,
-              duration,
-              event: "timeupdate",
-              provider: "cinesrc",
-            },
-            { provider: "cinesrc" },
-          );
-        }
-
-        if (event.data.type === "cinesrc:ended") {
-          const availableNextEpisode = nextEpisodeRef.current;
-          const shouldShowNextEpisodePrompt =
-            mediaType === "tv" && providerId === "cinesrc" && Boolean(availableNextEpisode);
-
-          setNextEpisodePromptVisible((current) =>
-            current === shouldShowNextEpisodePrompt ? current : shouldShowNextEpisodePrompt,
-          );
-
-          if (mediaType === "tv" && autoplayNextEpisodeRef.current && availableNextEpisode) {
-            advanceToEpisodeRef.current(
-              displayStateRef.current.season,
-              availableNextEpisode.episode_number,
-              availableNextEpisode,
-            );
-          }
-        }
-
-        if (event.data.type === "cinesrc:nextepisode" && mediaType === "tv") {
-          const nextSeason = normalizeEpisodeNumber(event.data.season, displayStateRef.current.season || season || 1);
-          const nextEpisodeNumber = normalizeEpisodeNumber(
-            event.data.episode,
-            displayStateRef.current.episode || episode || 1,
-          );
-          const nextEpisodeData =
-            nextSeason === Number(displayStateRef.current.season)
-              ? seasonEpisodes.find((item) => item.episode_number === Number(nextEpisodeNumber))
-              : null;
-
-          advanceToEpisodeRef.current(nextSeason, nextEpisodeNumber, nextEpisodeData || null);
-        }
-      }
-
-      if (isVideasyMessage) {
-        const payload = extractVideasyPayload(event.data, {
-          id,
-          mediaType,
-          season: displayStateRef.current.season || season || 1,
-          episode: displayStateRef.current.episode || episode || 1,
-        });
-
-        if (!payload) {
-          return;
-        }
-
-        if ((Number(payload.currentTime) || 0) <= 0 && (Number(payload.progressPercent) || 0) <= 0) {
-          return;
-        }
-
-        const availableNextEpisode = nextEpisodeRef.current;
-        const computedProgress =
-          payload.duration > 0 ? (payload.currentTime / payload.duration) * 100 : payload.progressPercent;
-        const shouldShowNextEpisodePrompt =
-          mediaType === "tv" &&
-          providerId === "videasy" &&
-          Boolean(availableNextEpisode) &&
-          Number.isFinite(computedProgress) &&
-          computedProgress >= 90;
-
-        setNextEpisodePromptVisible((current) =>
-          current === shouldShowNextEpisodePrompt ? current : shouldShowNextEpisodePrompt,
-        );
-
-        if (mediaType === "tv" && (payload.season || payload.episode)) {
-          const payloadSeason = normalizeEpisodeNumber(
-            payload.season,
-            displayStateRef.current.season || season || 1,
-          );
-          const payloadEpisode = normalizeEpisodeNumber(
-            payload.episode,
-            displayStateRef.current.episode || episode || 1,
-          );
-          const syncedEpisode =
-            payloadSeason === Number(displaySeason)
-              ? seasonEpisodes.find((item) => item.episode_number === Number(payloadEpisode))
-              : null;
-
-          syncObservedEpisodeRef.current(payloadSeason, payloadEpisode, syncedEpisode?.name || null);
-
-          if (!isSameEpisodePosition(payloadSeason, payloadEpisode, season, episode)) {
-            setSeason(payloadSeason);
-            setEpisode(payloadEpisode);
-            syncUrl({
-              mediaType,
-              id,
-              providerId,
-              season: payloadSeason,
-              episode: payloadEpisode,
-            });
-          }
-        }
-
-        flushProgress(
-          {
-            id: payload.id,
-            mediaType: payload.mediaType || mediaType,
-            season: normalizeEpisodeNumber(payload.season, displayStateRef.current.season || season || 1),
-            episode: normalizeEpisodeNumber(payload.episode, displayStateRef.current.episode || episode || 1),
-            currentTime: payload.currentTime,
-            duration: payload.duration,
-            event: "timeupdate",
-            provider: "videasy",
-          },
-          { provider: "videasy" },
+      const availableNextEpisode = nextEpisodeRef.current;
+      if (payload.event === "ended" && mediaType === "tv" &&
+          autoplayNextEpisodeRef.current && availableNextEpisode &&
+          !(introPlaybackRef.current?.key === seedKey && introPlaybackRef.current?.hasCredits)) {
+        advanceToEpisodeRef.current(
+          availableNextEpisode.season_number || season,
+          availableNextEpisode.episode_number,
+          availableNextEpisode,
         );
       }
     }
@@ -954,6 +587,9 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     season,
     seasonEpisodes,
     displaySeason,
+    progressKey,
+    playbackSeed.key,
+    playbackSeed.resumeTime,
   ]);
 
   useEffect(() => {
@@ -964,55 +600,27 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
         return;
       }
 
-      recordProgress({
-        id: normalizeMediaId(payload.tmdbId ?? payload.mtmdbId ?? payload.id, id),
-        mediaType: payload.mediaType || mediaType,
-        season: payload.season || season,
-        episode: payload.episode || episode,
+      lastProgressPayloadRef.current = null;
+      recordProgressRef.current({
+        ...payload,
         currentTime: payload.currentTime ?? payload.watched,
-        duration: payload.duration,
-        provider: payload.provider || providerId,
-        snapshot: detail,
       });
     }
 
+    function flushWhenHidden() {
+      if (document.visibilityState === "hidden") flushBeforeExit();
+    }
+    document.addEventListener("visibilitychange", flushWhenHidden);
     window.addEventListener("pagehide", flushBeforeExit);
     window.addEventListener("beforeunload", flushBeforeExit);
 
     return () => {
+      flushBeforeExit();
+      document.removeEventListener("visibilitychange", flushWhenHidden);
       window.removeEventListener("pagehide", flushBeforeExit);
       window.removeEventListener("beforeunload", flushBeforeExit);
     };
-  }, [detail, episode, id, mediaType, providerId, recordProgress, season]);
-
-  useEffect(() => {
-    function handleKeydown(event) {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-
-      if (isFormElement(event.target)) {
-        return;
-      }
-
-      const managedKeys = [" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "c", "C"];
-
-      if (!managedKeys.includes(event.key)) {
-        return;
-      }
-
-      event.preventDefault();
-
-      if (document.activeElement instanceof HTMLElement && ["BUTTON", "A"].includes(document.activeElement.tagName)) {
-        document.activeElement.blur();
-      }
-
-      focusPlayer();
-    }
-
-    window.addEventListener("keydown", handleKeydown, true);
-    return () => window.removeEventListener("keydown", handleKeydown, true);
-  }, [focusPlayer]);
+  }, []);
 
   if (detailQuery.loading && !detailQuery.data) {
     return <LoadingState fullScreen brand title="FlavFlix" description="Preparing your player." />;
@@ -1066,6 +674,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
 
   function handleProviderSwitch(candidate) {
     setProviderId(candidate);
+    setNextEpisodePromptVisible(false);
     setPanelOpen(false);
     const nextSeason = mediaType === "tv" ? displayStateRef.current.season : undefined;
     const nextEpisode = mediaType === "tv" ? displayStateRef.current.episode : undefined;
@@ -1141,14 +750,17 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   }
 
   const topChromeVisible = controlsVisible || panelOpen;
+  const savedProgressReachedThreshold =
+    Boolean(displayedProgress?.watchedComplete) || Number(displayedProgress?.percent || 0) >= 0.9;
+  const creditsPlayback = introPlayback?.key === `${providerId}:${progressKey}` ? introPlayback : null;
+  const creditsMode = mediaType === "tv" && Boolean(creditsPlayback?.hasCredits);
   const showNextEpisodeCta =
-    ["vidlink", "cinesrc", "videasy"].includes(providerId) &&
     mediaType === "tv" &&
     Boolean(nextEpisode) &&
-    nextEpisodePromptVisible;
-  const showHeaderTitle = !["vidlink", "videasy", "7xstream"].includes(providerId);
-  const backButtonOnRight = providerId === "vidlink";
-  const showHeaderShadow = !["7xstream", "videasy", "vidlink"].includes(providerId);
+    (creditsMode ? creditsPlayback.inCredits : nextEpisodePromptVisible || savedProgressReachedThreshold);
+  const buttonConfig = getButtonConfig(providerId);
+  const backBesideWatchOptions = buttonConfig.back.besideWatchOptions;
+  const showHeaderShadow = buttonConfig.upperShadow;
   const showSidebarEpisodeNavigation = mediaType === "tv";
   const watchOptionsVisible = topChromeVisible;
   const saved = detail ? isSaved(id, mediaType) : false;
@@ -1174,6 +786,17 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   const hubProgressPercent = toProgressPercent(hubProgress);
   const controlChromeClassName =
     "inline-flex min-h-[42px] items-center gap-2 rounded-full bg-[rgba(10,10,14,0.34)] px-3 py-2 text-xs font-semibold text-white shadow-[0_18px_46px_rgba(0,0,0,0.22)] backdrop-blur-[18px] sm:min-h-[44px] sm:px-4 sm:text-sm";
+  const backButton = (
+    <AppLink
+      href={`/${mediaType}/${id}`}
+      onClick={handleBackNavigationStart}
+      onMouseUp={releaseControlFocus}
+      className={cn(controlChromeClassName, "shrink-0 border border-white/10")}
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Back
+    </AppLink>
+  );
   const watchHubCardClassName =
     "rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.065),rgba(255,255,255,0.022))] p-4 shadow-[0_20px_56px_rgba(0,0,0,0.24)] sm:p-5";
   const watchHubSectionAnimationClassName = panelOpen
@@ -1183,32 +806,51 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   return (
     <div
       ref={playerRootRef}
-      className="fixed inset-0 overflow-hidden bg-black text-white"
+      tabIndex={-1}
+      className="fixed inset-0 overflow-hidden bg-black text-white outline-none"
       onFocusCapture={() => revealControls(CONTROL_IDLE_DELAY)}
     >
-      {previewSecondsLeft > 0 ? (
-        <PlayerShell
-          src={embedUrl}
-          title={`${titleLabel} player`}
-          fullViewport
-          iframeRef={iframeRef}
-        />
-      ) : (
-        <div className="absolute inset-0 z-[115] flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(227,31,92,0.17),rgba(2,2,4,0.98)_58%)] px-6 text-center">
-          <div className="max-w-xl rounded-[32px] border border-white/12 bg-black/55 p-8 shadow-panel backdrop-blur-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-accent-300">Showcase preview complete</p>
-            <h1 className="mt-4 text-3xl font-semibold text-white sm:text-4xl">Five-minute viewing limit reached</h1>
-            <p className="mt-4 text-sm leading-7 text-white/60">This portfolio demonstration limits each movie or episode to five minutes. You can return to FlavFlix and explore another title.</p>
-            <AppLink href="/" className="mt-6 inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold text-black">Back to FlavFlix</AppLink>
-          </div>
-        </div>
-      )}
+      <PlayerShell
+        key={`${activeProfile?.id || "visitor"}:${progressKey}`}
+        previewKey={`flavflix-showcase-preview:${activeProfile?.id || "visitor"}:${progressKey}`}
+        src={embedUrl}
+        title={`${titleLabel} player`}
+        fullViewport
+        iframeRef={iframeRef}
+      />
 
-      {previewSecondsLeft > 0 ? (
-        <div className="pointer-events-none absolute left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] -translate-x-1/2 rounded-full border border-white/15 bg-black/65 px-4 py-2 text-xs font-semibold text-white/85 shadow-lg backdrop-blur-md">
-          Showcase preview · {Math.floor(previewSecondsLeft / 60)}:{String(previewSecondsLeft % 60).padStart(2, "0")} remaining
-        </div>
+      <button
+        type="button"
+        onClick={toggleFlavflixFullscreen}
+        style={getFullscreenButtonStyle(providerId)}
+        className="absolute bottom-[var(--fullscreen-mobile-bottom)] right-[var(--fullscreen-mobile-right)] z-[60] h-[var(--fullscreen-mobile-height)] w-[var(--fullscreen-mobile-width)] cursor-pointer border-0 bg-transparent p-0 text-transparent outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/60 md:bottom-[var(--fullscreen-desktop-bottom)] md:right-[var(--fullscreen-desktop-right)] md:h-[var(--fullscreen-desktop-height)] md:w-[var(--fullscreen-desktop-width)]"
+        aria-label={fullscreenActive ? "Exit fullscreen" : "Enter fullscreen"}
+        aria-pressed={fullscreenActive}
+        aria-keyshortcuts="F"
+        title="Toggle fullscreen (F)"
+      />
+      {fullscreenError ? (
+        <p role="status" className="absolute inset-x-16 top-4 z-[60] text-center text-sm text-white">{fullscreenError}</p>
       ) : null}
+
+      <IntroSkipButton
+        key={embedUrl}
+        providerId={providerId}
+        mediaType={mediaType}
+        id={id}
+        season={season}
+        episode={episode}
+        iframeRef={iframeRef}
+        hidden={panelOpen || navigationPending}
+        raised={showNextEpisodeCta}
+        onPlaybackChange={(playback) => {
+          const next = { ...playback, key: `${providerId}:${progressKey}` };
+          introPlaybackRef.current = next;
+          setIntroPlayback((previous) => previous?.key === next.key &&
+            previous.hasCredits === next.hasCredits && previous.inCredits === next.inCredits &&
+            previous.previewStart === next.previewStart && previous.paused === next.paused ? previous : next);
+        }}
+      />
 
       {navigationPending ? (
         <div className="absolute inset-0 z-[120] bg-[#050507ea] backdrop-blur-md">
@@ -1223,16 +865,6 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
         onMouseDown={() => revealControls(CONTROL_IDLE_DELAY)}
       />
 
-      {providerId === "videasy" ? (
-        <button
-          type="button"
-          onClick={toggleFlavflixFullscreen}
-          className="absolute bottom-0 right-0 z-[34] h-24 w-28 touch-manipulation cursor-default opacity-0 md:h-16 md:w-20"
-          aria-label="Toggle fullscreen"
-          tabIndex={-1}
-        />
-      ) : null}
-
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 top-0 z-20 h-40 bg-gradient-to-b from-[#020204f2] via-[#020204c2] to-transparent transition duration-300",
@@ -1240,48 +872,26 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
         )}
       />
 
-      <div
+      {!backBesideWatchOptions ? <div
+        style={getHeaderButtonStyle(providerId, "back")}
         className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-start gap-3 px-3 pb-3 pl-[6.8rem] pt-[calc(0.75rem+env(safe-area-inset-top))] transition duration-300 md:px-8 md:py-4 md:pl-[8.4rem]",
-          topChromeVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0",
-        )}
-        onMouseMove={() => revealControls(CONTROL_IDLE_DELAY)}
-      >
-        {showHeaderTitle ? (
-          <div className={cn("flex items-center gap-3", topChromeVisible ? "pointer-events-auto" : "pointer-events-none")}>
-            <div className={cn(controlChromeClassName, "hidden border border-white/8 text-white/88 md:block")}>
-              {titleLabel}
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div
-        className={cn(
-          "absolute left-3 top-0 z-[33] flex items-center gap-3 px-0 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] md:left-8 md:py-4",
-          backButtonOnRight ? "translate-x-[calc(100vw-18rem)] md:translate-x-[calc(100vw-22rem)]" : "translate-x-0",
+          "absolute left-[var(--header-mobile-left)] right-[var(--header-mobile-right)] top-0 z-[33] flex items-center gap-3 px-0 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] md:left-[var(--header-desktop-left)] md:right-[var(--header-desktop-right)] md:py-4",
           topChromeVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0",
           topChromeVisible ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
-        <AppLink
-          href={`/${mediaType}/${id}`}
-          onClick={handleBackNavigationStart}
-          onMouseUp={releaseControlFocus}
-          className={cn(controlChromeClassName, "border border-white/10")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </AppLink>
-      </div>
+        {backButton}
+      </div> : null}
 
       <div
+        style={getHeaderButtonStyle(providerId, "watchOptions")}
         className={cn(
-          "absolute right-3 top-0 z-[33] flex items-center gap-3 px-0 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] md:right-8 md:py-4",
+          "absolute left-[var(--header-mobile-left)] right-[var(--header-mobile-right)] top-0 z-[33] flex [flex-direction:var(--header-mobile-direction)] items-center gap-3 px-0 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] transition-[transform,opacity] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] md:left-[var(--header-desktop-left)] md:right-[var(--header-desktop-right)] md:[flex-direction:var(--header-desktop-direction)] md:py-4",
           watchOptionsVisible ? "translate-y-0 opacity-100" : "-translate-y-5 opacity-0",
           watchOptionsVisible ? "pointer-events-auto" : "pointer-events-none",
         )}
       >
+        {backBesideWatchOptions ? backButton : null}
         <button
           type="button"
           onClick={() => {
@@ -1290,7 +900,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
             focusPlayer();
           }}
           onMouseUp={releaseControlFocus}
-          className={cn(controlChromeClassName, "pointer-events-auto border border-white/10")}
+          className={cn(controlChromeClassName, "shrink-0 border border-white/10")}
         >
           {panelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           Watch Options
@@ -1422,6 +1032,15 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
                     )}
                     style={{ transitionDelay: panelOpen ? `${100 + index * 26}ms` : "0ms" }}
                   >
+                    {metadata.audioLanguage === "it" ? (
+                      <svg viewBox="0 0 3 2" role="img" aria-label="Italian audio"
+                        className="absolute right-2 top-2 h-2.5 w-4 overflow-hidden rounded-[2px]">
+                        <title>Italian audio</title>
+                        <path fill="#009246" d="M0 0h1v2H0z" />
+                        <path fill="#fff" d="M1 0h1v2H1z" />
+                        <path fill="#ce2b37" d="M2 0h1v2H2z" />
+                      </svg>
+                    ) : null}
                     <div className="flex min-w-0 items-center gap-3">
                       <span className={cn("inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-black", active ? "border-white/18 bg-white/18" : "border-white/10 bg-white/[0.055]")}>
                         {providerGlyph}
@@ -1608,14 +1227,6 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
                             {hubProgress ? ` | ${Math.round(hubProgress.percent * 100)}% watched` : ""}
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={playHubSelection}
-                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/16 text-white shadow-[0_16px_38px_rgba(0,0,0,0.28)] backdrop-blur transition hover:bg-white/24"
-                          aria-label="Play selected episode"
-                        >
-                          <PlayCircle className="h-6 w-6 fill-current" />
-                        </button>
                       </div>
                       <p className="mt-4 line-clamp-3 text-sm leading-6 text-white/72">
                         {hubSelectedEpisode?.overview || "No episode synopsis is available from TMDB for this episode yet."}
@@ -1663,32 +1274,56 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
         </div>
       </section>
 
-      <div
-        className={cn(
-          "pointer-events-none absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-[55] transition duration-300 md:bottom-28 md:right-8",
-          showNextEpisodeCta && !panelOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            advanceToEpisode(displayStateRef.current.season, nextEpisode.episode_number, nextEpisode);
+      {creditsMode && nextEpisode ? (
+        <CreditsNextEpisode
+          key={embedUrl}
+          visible={showNextEpisodeCta && !panelOpen && !navigationPending}
+          paused={Boolean(creditsPlayback?.paused)}
+          previewStart={creditsPlayback?.previewStart ?? null}
+          canSeek={Boolean(buildProviderSeekCommand(providerId, 0))}
+          season={nextEpisode.season_number || displaySeason}
+          episode={nextEpisode.episode_number}
+          onNext={() => {
+            advanceToEpisode(nextEpisode.season_number || displayStateRef.current.season, nextEpisode.episode_number, nextEpisode);
             revealControls(CONTROL_IDLE_DELAY);
           }}
-          onMouseMove={() => revealControls(CONTROL_IDLE_DELAY)}
-          onMouseUp={releaseControlFocus}
+          onPreview={(time) => {
+            const command = buildProviderSeekCommand(providerId, time);
+            if (command) iframeRef.current?.contentWindow?.postMessage(command, getProviderMetadata(providerId).origin);
+          }}
+        />
+      ) : showNextEpisodeCta && !panelOpen ? (
+        <div
           className={cn(
-            "inline-flex items-center gap-3 rounded-full border border-accent-300/34 bg-[rgba(58,10,25,0.88)] px-4 py-3 text-sm font-semibold text-white shadow-[0_24px_62px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:scale-[1.02] hover:bg-[rgba(74,14,33,0.94)] sm:px-5",
-            showNextEpisodeCta && !panelOpen ? "pointer-events-auto" : "pointer-events-none",
+            "absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] right-4 z-[55] transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:bottom-28 md:right-8",
+            topChromeVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0",
           )}
+          onMouseMove={() => revealControls(CONTROL_IDLE_DELAY)}
+          onMouseEnter={() => revealControls(CONTROL_IDLE_DELAY)}
+          onMouseDown={() => revealControls(CONTROL_IDLE_DELAY)}
         >
-          <SkipForward className="h-4 w-4" />
-          Next Episode
-          <span className="text-white/62">
-            S{displayStateRef.current.season} E{nextEpisode?.episode_number}
-          </span>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              advanceToEpisode(
+                nextEpisode.season_number || displayStateRef.current.season,
+                nextEpisode.episode_number,
+                nextEpisode,
+              );
+              revealControls(CONTROL_IDLE_DELAY);
+            }}
+            onMouseMove={() => revealControls(CONTROL_IDLE_DELAY)}
+            onMouseUp={releaseControlFocus}
+            className="inline-flex items-center gap-3 rounded-full border border-accent-300/34 bg-[rgba(58,10,25,0.88)] px-4 py-3 text-sm font-semibold text-white shadow-[0_24px_62px_rgba(0,0,0,0.48)] backdrop-blur-xl transition hover:scale-[1.02] hover:bg-[rgba(74,14,33,0.94)] sm:px-5"
+          >
+            <SkipForward className="h-4 w-4" />
+            Next Episode
+            <span className="text-white/62">
+              S{nextEpisode.season_number || displayStateRef.current.season} E{nextEpisode.episode_number}
+            </span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

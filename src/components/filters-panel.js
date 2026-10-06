@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 
-export function FiltersPanel({ genres = [], filters, onChange, sortOptions, mediaType = "movie" }) {
+export function FiltersPanel({ genres = [], languages = [], filters, onChange, sortOptions, mediaType = "movie", unboxed = false }) {
   const [open, setOpen] = useState(false);
-  const activeFilterCount = [filters.genre, filters.year, filters.rating, filters.runtime, filters.language].filter(Boolean).length;
+  const activeFilterCount = [filters.genre, filters.yearFrom || filters.yearTo, filters.rating, filters.runtime, filters.language].filter(Boolean).length;
 
   const fields = (
     <>
@@ -23,29 +23,27 @@ export function FiltersPanel({ genres = [], filters, onChange, sortOptions, medi
         </select>
       </label>
 
-      <label className="flex flex-col gap-2 text-sm text-white/55">
-        <span>{mediaType === "movie" ? "Release year" : "First air year"}</span>
-        <input
-          type="number"
-          value={filters.year}
-          onChange={(event) => onChange("year", event.target.value)}
-          placeholder="2026"
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none"
-        />
-      </label>
+      <fieldset className="min-w-0 text-sm text-white/55">
+        <legend className="mb-2 block">Year span</legend>
+        <div className="flex min-h-12 w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] focus-within:ring-2 focus-within:ring-accent-300/60">
+          <input name="year-from" type="number" min="1870" max="2200" value={filters.yearFrom} onChange={(event) => onChange("yearFrom", event.target.value.slice(0, 4))} placeholder="From" aria-label="Starting year" className="min-w-0 flex-1 bg-transparent px-3 text-white placeholder:text-white/28 focus:outline-none" />
+          <span className="self-center text-white/25">-</span>
+          <input name="year-to" type="number" min="1870" max="2200" value={filters.yearTo} onChange={(event) => onChange("yearTo", event.target.value.slice(0, 4))} placeholder="To" aria-label="Finishing year" className="min-w-0 flex-1 bg-transparent px-3 text-white placeholder:text-white/28 focus:outline-none" />
+        </div>
+      </fieldset>
 
       <label className="flex flex-col gap-2 text-sm text-white/55">
-        <span>Rating floor</span>
-        <input
-          type="number"
-          min="0"
-          max="10"
-          step="0.1"
+        <span>Rating</span>
+        <select
           value={filters.rating}
           onChange={(event) => onChange("rating", event.target.value)}
-          placeholder="7.5"
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none"
-        />
+          className="brand-select"
+        >
+          <option value="">Any rating</option>
+          {Array.from({ length: 9 }, (_, index) => index + 1).map((rating) => (
+            <option key={rating} value={rating}>{rating}+</option>
+          ))}
+        </select>
       </label>
 
       <label className="flex flex-col gap-2 text-sm text-white/55">
@@ -62,13 +60,18 @@ export function FiltersPanel({ genres = [], filters, onChange, sortOptions, medi
 
       <label className="flex flex-col gap-2 text-sm text-white/55">
         <span>Original language</span>
-        <input
-          type="text"
+        <select
           value={filters.language}
           onChange={(event) => onChange("language", event.target.value)}
-          placeholder="en"
-          className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-white outline-none"
-        />
+          className="brand-select"
+        >
+          <option value="">Any language</option>
+          {languages.map((language) => (
+            <option key={language.iso_639_1} value={language.iso_639_1}>
+              {language.english_name || language.name} ({language.iso_639_1})
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="flex flex-col gap-2 text-sm text-white/55">
@@ -90,7 +93,7 @@ export function FiltersPanel({ genres = [], filters, onChange, sortOptions, medi
 
   return (
     <>
-      <div className="surface flex items-center justify-between gap-3 p-4 lg:hidden">
+      <div className={`${unboxed ? "" : "surface p-4"} flex items-center justify-between gap-3 lg:hidden`}>
         <div>
           <p className="text-sm font-semibold text-white">Filters</p>
           <p className="mt-1 text-xs text-white/52">
@@ -143,7 +146,7 @@ export function FiltersPanel({ genres = [], filters, onChange, sortOptions, medi
         </div>
       ) : null}
 
-      <div className="surface hidden gap-4 p-5 lg:grid lg:grid-cols-6">{fields}</div>
+      <div className={`${unboxed ? "" : "surface p-5"} hidden gap-3 lg:grid lg:grid-cols-3 2xl:grid-cols-6`}>{fields}</div>
     </>
   );
 }
