@@ -304,15 +304,15 @@ export function MediaHero({ items = [], configuration }) {
               />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-white/82 sm:mt-5 sm:gap-3 sm:text-sm">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5">
                 <Clapperboard className="h-4 w-4 text-accent-200" />
                 {activeItem.mediaType === "movie" ? "Movie" : "TV Series"}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5">
                 <CalendarDays className="h-4 w-4 text-accent-200" />
                 {releaseLabel}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5">
                 <Star className="h-4 w-4 text-yellow-300" />
                 {formatVote(activeItem.voteAverage)} TMDB
               </span>
@@ -354,7 +354,7 @@ export function MediaHero({ items = [], configuration }) {
 
           {items.length > 1 ? (
             <div className="mt-6 flex justify-center sm:mt-7 md:justify-start">
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/45 bg-black/34 px-4 py-3 shadow-[0_18px_42px_rgba(0,0,0,0.28)] ring-1 ring-white/10 backdrop-blur">
+              <div className="inline-flex items-center gap-2">
                 {items.slice(0, 6).map((item, index) => {
                   const candidate = normalizeMediaItem(item, item.media_type || item.mediaType);
 

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes episode-countdown-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
 :root {
   color-scheme: dark;
   --background: #060608;

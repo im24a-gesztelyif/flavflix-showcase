@@ -1,16 +1,42 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { LibraryScreen } from "@/components/screens/library-screen";
 import { useAppState } from "@/lib/app-state";
-import { createMediaActivityKey, shouldShowInContinueWatching } from "@/lib/media";
+import { createMediaActivityKey } from "@/lib/media";
+import { getContinueWatchingEntries, getFinalEpisode } from "@/lib/watch-history";
+import { tmdbClientGet } from "@/lib/tmdb-client";
 import { formatFullDate } from "@/lib/utils";
 
 function ContinueWatchingClient() {
   const { activeProfileData, clearMediaActivity } = useAppState();
-  const items = Object.values(activeProfileData.progress || {})
-    .filter((entry) => shouldShowInContinueWatching(entry))
-    .sort((left, right) => new Date(right.updatedAt) - new Date(left.updatedAt))
+  const [seriesEndings, setSeriesEndings] = useState({});
+  const progress = Object.values(activeProfileData.progress || {});
+  const missingSeriesIds = JSON.stringify([...new Set(progress
+    .filter((entry) => entry.mediaType === "tv" && Number(entry.percent) >= 0.9 && !getFinalEpisode(entry.snapshot))
+    .map((entry) => Number(entry.id)))].sort((a, b) => a - b));
+
+  useEffect(() => {
+    let cancelled = false;
+    // Older saved progress predates finale metadata. Resolve it without changing watch progress.
+    Promise.all(JSON.parse(missingSeriesIds).map(async (id) => {
+      try {
+        return [id, getFinalEpisode(await tmdbClientGet(`tv/${id}`))];
+      } catch {
+        return [id, null];
+      }
+    })).then((endings) => {
+      if (!cancelled) setSeriesEndings(Object.fromEntries(endings));
+    });
+    return () => { cancelled = true; };
+  }, [missingSeriesIds]);
+
+  const items = getContinueWatchingEntries(progress.map((entry) => (
+    entry.mediaType === "tv" && seriesEndings[entry.id]
+      ? { ...entry, snapshot: { ...entry.snapshot, finalEpisode: seriesEndings[entry.id] } }
+      : entry
+  )))
     .reduce((collection, entry) => {
       const key = createMediaActivityKey(entry);
 
@@ -30,7 +56,7 @@ function ContinueWatchingClient() {
     <LibraryScreen
       eyebrow="Continue Watching"
       title="Resume where you left off"
-      description="Saved progress records are grouped by profile and displayed as resumable watch entries in the interface."
+      description="Your unfinished movies and series, saved locally for this profile."
       items={items}
       emptyTitle="No unfinished sessions"
       emptyDescription="Start a movie or episode on the watch page and progress will land here automatically."
