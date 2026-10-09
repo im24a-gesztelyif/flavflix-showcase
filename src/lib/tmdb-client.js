@@ -72,6 +72,7 @@ export async function tmdbClientGet(path, params = {}, options = {}) {
   });
 
   const response = await fetch(`/api/tmdb?${query.toString()}`, {
+    signal: options.signal,
     headers: {
       accept: "application/json",
     },

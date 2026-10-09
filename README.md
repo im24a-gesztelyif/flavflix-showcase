@@ -21,6 +21,7 @@ FlavFlix Showcase is the public, interactive demonstration of my private FlavFli
 - Switch between available playback sources when necessary
 - Explore redesigned title details, random picks, award filters, and upcoming releases
 - Demonstrate intro skips and next-episode credits controls when third-party playback data is available
+- Resume series at the next released, unwatched episode after completing an episode
 - Use the responsive desktop and mobile interface
 
 ## The five-minute preview
@@ -56,3 +57,15 @@ Add your server-side metadata API credentials to `.env.local`:
 | `NEXT_PUBLIC_TMDB_REGION` | Default regional setting |
 
 No Supabase project, database, login, or account configuration is required. Profiles and application state use browser `localStorage` specifically for this public demonstration.
+
+Skip timestamps combine SkipDB and TheIntroDB when available. Missing coverage or a service outage does not prevent playback; skipping controls depend on the embedded source's supported events.
+
+## Development checks
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+The tests include showcase-specific guardrails alongside skip-timestamp and series-resume checks. See [showcase sync notes](docs/showcase-sync.md) for the read-only upstream update process and automation setup status.

@@ -38,13 +38,13 @@ export function IntroSkipButton({ providerId, mediaType, id, season, episode, if
     }
 
     async function loadSegments(duration) {
-      const params = new URLSearchParams({ v: "2", mediaType, tmdbId: String(id), durationMs: String(Math.round(duration * 1000)) });
+      const params = new URLSearchParams({ v: "3", mediaType, tmdbId: String(id), durationMs: String(Math.round(duration * 1000)) });
       if (mediaType === "tv") {
         params.set("season", String(season));
         params.set("episode", String(episode));
       }
       try {
-        const response = await fetch(`/api/introdb?${params}`, { signal: controller.signal });
+        const response = await fetch(`/api/skip-segments?${params}`, { signal: controller.signal });
         if (!response.ok) return;
         const data = await response.json();
         if (controller.signal.aborted) return;
