@@ -16,8 +16,8 @@ New upstream features may need adaptation instead of direct copying, especially 
 
 Run `npm test`, `npm run lint` and `npm run build`, then require GitHub CI to pass before merging the showcase PR. Verify Vercel reports a successful production deployment and the public site serves the changed code. If access fails or a change needs a new external service/permission, leave the production version intact and ask for input.
 
-## Recurring-task setup (not active yet)
+## GitHub automation
 
-The desktop scheduling tool was unavailable during setup, so no recurring task has been activated. The intended schedule is every 15 minutes, using the workflow above. This is polling, not an instant GitHub push hook. The computer and app must be running. A future task should compare the upstream default-branch commit with the marker, do nothing when unchanged, and adapt, test, merge and verify new updates when safe. Report only completed updates, failures or required user input.
+The GitHub-hosted workflow in the private source repository replaces the proposed desktop recurring task. See [activation and operation](github-auto-sync.md). The only source-repository change is that automation workflow; application code remains unchanged.
 
-Do not substitute a blind copy job: future authentication or playback changes must be reviewed and adapted before public deployment. Instant/cloud syncing would require a separately authorized integration with private-source access; no source-repository webhook or workflow has been changed.
+The incremental merge script preserves existing showcase edits and fails closed for sensitive state/dependency changes or conflicts. It does not use an AI service. Workflows require the one-time `SHOWCASE_SYNC_TOKEN` secret before publication can work. No desktop task or webhook is needed.
