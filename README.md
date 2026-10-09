@@ -68,4 +68,4 @@ npm run lint
 npm run build
 ```
 
-The tests include showcase-specific guardrails alongside skip-timestamp and series-resume checks. See [showcase sync notes](docs/showcase-sync.md) for the read-only upstream update process and automation setup status.
+The tests include showcase-specific guardrails alongside skip-timestamp and series-resume checks. See [GitHub automatic updates](docs/github-auto-sync.md) for activation, and [showcase sync notes](docs/showcase-sync.md) for the upstream adaptation rules.
