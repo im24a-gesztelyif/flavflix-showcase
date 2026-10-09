@@ -46,6 +46,7 @@ export async function tmdbGet(path, params = {}, options = {}) {
 
   const isSearch = path.startsWith("search/");
   const response = await fetch(url, {
+    signal: options.signal,
     headers: {
       Authorization: `Bearer ${token}`,
       accept: "application/json",

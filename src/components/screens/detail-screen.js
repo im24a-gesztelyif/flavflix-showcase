@@ -492,13 +492,7 @@ function DetailScreenContent({ mediaType, id }) {
     : null;
   const movieWatched = Boolean(movieProgress?.watchedComplete || Number(movieProgress?.percent) >= 0.9);
   const money = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
-  const watchHref =
-    mediaType === "tv"
-      ? getWatchHref(mediaType, id, {
-          season: resumeEntry?.season || 1,
-          episode: resumeEntry?.episode || 1,
-        })
-      : getWatchHref(mediaType, id);
+  const watchHref = getWatchHref(mediaType, id);
   const trailer = pickTrailer(detail.videos?.results || []);
   const dateLabel = formatFullDate(detail.release_date || detail.first_air_date);
   const playable = isPlayableMedia(detail, mediaType);

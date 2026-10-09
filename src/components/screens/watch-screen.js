@@ -15,6 +15,8 @@ import { readProviderMessage, resolveProviderProgress } from "@/lib/provider-eve
 import { bindPlayerFullscreenControls, getFullscreenElement, togglePlayerFullscreen } from "@/lib/player-fullscreen";
 import { getButtonConfig, getFullscreenButtonStyle, getHeaderButtonStyle } from "@/lib/button-config";
 import { useTmdbQuery } from "@/hooks/use-tmdb-query";
+import { tmdbClientGet } from "@/lib/tmdb-client";
+import { isEpisodeFinished, resolveSeriesResume } from "@/lib/series-resume";
 import { buildImageUrl, buildPosterUrl, cn, formatRuntime, formatSeconds } from "@/lib/utils";
 
 function syncUrl({ mediaType, id, providerId, season, episode }) {
@@ -55,7 +57,9 @@ function toProgressPercent(progressEntry) {
 const CONTROL_IDLE_DELAY = 3000;
 
 export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, initialProvider }) {
-  const { settings, recordProgress, activeProfile, activeProfileData, isSaved, toggleSaved } = useAppState();
+  const { settings, recordProgress, activeProfile, activeProfileData, isSaved, toggleSaved, ready } = useAppState();
+  const [resumeSelectionId, setResumeSelectionId] = useState(null);
+  const resumeSelectionRef = useRef(null);
   const recordProgressRef = useRef(recordProgress);
   recordProgressRef.current = recordProgress;
   const initialSeasonNumber = initialSeason ? Number(initialSeason) : 1;
@@ -289,19 +293,24 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
   }, [id, initialEpisode, initialSeason, mediaType]);
 
   useEffect(() => {
-    if (mediaType === "tv" && !initialSeason && !initialEpisode) {
-      const latestTvProgress = Object.values(activeProfileData.progress || {})
-        .filter((entry) => entry.id === Number(id) && entry.mediaType === "tv")
-        .sort((left, right) => new Date(right.updatedAt) - new Date(left.updatedAt))[0];
-
-      if (latestTvProgress) {
-        setSeason(latestTvProgress.season || 1);
-        setEpisode(latestTvProgress.episode || 1);
-        updateDisplayState(latestTvProgress.season || 1, latestTvProgress.episode || 1);
-
-      }
-    }
-  }, [activeProfileData.progress, id, initialEpisode, initialSeason, mediaType]);
+    if (mediaType !== "tv" || initialSeason || initialEpisode || !ready || !detail ||
+        Number(detail.id) !== Number(id) || resumeSelectionRef.current === id) return;
+    let cancelled = false;
+    void resolveSeriesResume({
+      id, progress: activeProfileData.progress, seasons: detail.seasons,
+      loadSeason: (number) => tmdbClientGet(`tv/${id}/season/${number}`, { language: settings.language }, {
+        signal: AbortSignal.timeout(5000),
+      }),
+    }).then((target) => {
+      if (cancelled) return;
+      resumeSelectionRef.current = id;
+      setSeason(target.season);
+      setEpisode(target.episode);
+      updateDisplayState(target.season, target.episode);
+      setResumeSelectionId(id);
+    });
+    return () => { cancelled = true; };
+  }, [activeProfileData.progress, detail, id, initialEpisode, initialSeason, mediaType, ready, settings.language]);
 
   useEffect(() => {
     if (!getProviderMetadata(providerId).supportsProgress || mediaType !== "tv") {
@@ -354,7 +363,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     lastPlaybackMetricsRef.current = null;
     setPlaybackSeed({
       key: seedKey,
-      resumeTime: resumeEntry?.currentTime,
+      resumeTime: mediaType === "tv" && isEpisodeFinished(resumeEntry) ? 0 : resumeEntry?.currentTime,
     });
     const pendingProgress = lastProgressPayloadRef.current;
     if (pendingProgress) {
@@ -365,7 +374,7 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
       lastProgressPayloadRef.current = null;
     }
     lastProgressFlushRef.current = 0;
-  }, [playbackSeed.key, progressKey, providerId, resumeEntry?.currentTime]);
+  }, [mediaType, playbackSeed.key, progressKey, providerId, resumeEntry]);
 
   useEffect(() => {
     focusPlayer();
@@ -622,7 +631,9 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
     };
   }, []);
 
-  if (detailQuery.loading && !detailQuery.data) {
+  if ((detailQuery.loading && !detailQuery.data) || (detail && Number(detail.id) !== Number(id)) || !ready ||
+      (mediaType === "tv" && detail && !detailQuery.error && !initialSeason && !initialEpisode && resumeSelectionId !== id) ||
+      playbackSeed.key !== `${providerId}:${progressKey}`) {
     return <LoadingState fullScreen brand title="FlavFlix" description="Preparing your player." />;
   }
 
@@ -1272,6 +1283,11 @@ export function WatchScreen({ mediaType, id, initialSeason, initialEpisode, init
           </div>
 
         </div>
+        <p className="px-6 py-3 text-[10px] text-white/40">
+          Skip times: <a href="https://skipdb.tv/" target="_blank" rel="noreferrer" className="underline hover:text-white/70">SkipDB</a>
+          {" ("}<a href="https://skipdb.tv/license" target="_blank" rel="noreferrer" className="underline hover:text-white/70">ODbL</a>{") / "}
+          <a href="https://theintrodb.org/" target="_blank" rel="noreferrer" className="underline hover:text-white/70">TheIntroDB</a>
+        </p>
       </section>
 
       {creditsMode && nextEpisode ? (
